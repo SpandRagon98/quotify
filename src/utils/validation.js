@@ -4,6 +4,7 @@
  */
 
 import { findDuplicateLabels } from "./googleLinks";
+import { validateFormula } from "./formula";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[+]?[\d\s()-]{7,15}$/;
@@ -67,6 +68,7 @@ export function validateField(field, value) {
 export function validateForm(fields, values) {
   const errors = {};
   fields.forEach((field) => {
+    if (field.calculated) return; // calculated fields have no user input
     const error = validateField(field, values[field.id]);
     if (error) errors[field.id] = error;
   });
@@ -100,10 +102,24 @@ export function validatePreset(preset) {
   if (!preset.fields || preset.fields.length === 0) {
     errors.push("Add at least one field");
   }
+  // Labels usable inside a formula (number/boolean/other calculated fields).
+  const usableLabels = (preset.fields || [])
+    .filter((f) => f.type === "number" || f.type === "boolean" || f.calculated)
+    .map((f) => f.label);
+
   preset.fields?.forEach((f, i) => {
     if (!f.label || !f.label.trim()) errors.push(`Field ${i + 1} needs a label`);
-    if (f.type === "dropdown" && (!f.options || f.options.length === 0)) {
+    if (!f.calculated && f.type === "dropdown" && (!f.options || f.options.length === 0)) {
       errors.push(`"${f.label || `Field ${i + 1}`}" needs at least one dropdown option`);
+    }
+    if (f.calculated) {
+      const check = validateFormula(
+        f.formula || "",
+        usableLabels.filter((l) => l !== f.label)
+      );
+      if (!check.ok) {
+        errors.push(`"${f.label || `Field ${i + 1}`}" formula: ${check.error}`);
+      }
     }
   });
   // No two fields may share a label (placeholders must be unique).

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 
 /** Generic animated modal with backdrop + Escape-to-close. */
-export default function Modal({ open, title, onClose, children, footer }) {
+export default function Modal({ open, title, onClose, children, footer, wide = false }) {
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => e.key === "Escape" && onClose();
@@ -23,7 +23,7 @@ export default function Modal({ open, title, onClose, children, footer }) {
           onClick={onClose}
         >
           <motion.div
-            className="modal"
+            className={`modal ${wide ? "modal-wide" : ""}`}
             role="dialog"
             aria-modal="true"
             initial={{ opacity: 0, scale: 0.96, y: 12 }}

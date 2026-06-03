@@ -18,6 +18,15 @@ export default function FieldBuilder({ fields, onFieldsChange }) {
         helpText: "",
         options: [],
         textMode: "any",
+        // Calculated-field config (inert unless `calculated` is true).
+        calculated: false,
+        formula: "",
+        format: "number",
+        decimals: "",
+        prefix: "",
+        suffix: "",
+        // Optional toggle that gates a number field to 0 when off.
+        gateFieldId: "",
       },
     ]);
   };
@@ -53,6 +62,7 @@ export default function FieldBuilder({ fields, onFieldsChange }) {
               <FieldEditorRow
                 key={field.id}
                 field={field}
+                allFields={fields}
                 index={index}
                 total={fields.length}
                 onChange={updateField}

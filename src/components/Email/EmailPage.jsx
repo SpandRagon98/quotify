@@ -14,6 +14,7 @@ import EmailModal from "./EmailModal";
 import { useSheetData } from "../../hooks/useSheetData";
 import { useEmailTemplates } from "../../hooks/useEmailTemplates";
 import { searchRows, filterRows } from "../../utils/tableData";
+import { STATUS_COLUMNS } from "../../config/appConfig";
 
 export default function EmailPage({ presets, initialPresetId, onEditPreset }) {
   const { presetId, setPresetId, preset, isLinked, data, state, error, reload } =
@@ -38,6 +39,12 @@ export default function EmailPage({ presets, initialPresetId, onEditPreset }) {
 
   const handleFilter = (header, value) =>
     setFilters((prev) => ({ ...prev, [header]: value }));
+
+  // Always show the Approval / Decline / Negotiate status columns, even when the
+  // sheet doesn't have them yet (no customer has responded).
+  const missingStatus = STATUS_COLUMNS.filter((c) => !data.headers.includes(c));
+  const tableHeaders = [...data.headers, ...missingStatus];
+  const tableRows = visibleRows.map((r) => [...r, ...missingStatus.map(() => "")]);
 
   return (
     <div className="screen screen-wide">
@@ -118,10 +125,11 @@ export default function EmailPage({ presets, initialPresetId, onEditPreset }) {
                 {visibleRows.length} of {data.rows.length} records
               </div>
               <DataTable
-                headers={data.headers}
-                rows={visibleRows}
+                headers={tableHeaders}
+                rows={tableRows}
                 filters={filters}
                 onFilterChange={handleFilter}
+                statusColumns={STATUS_COLUMNS}
                 rowAction={{
                   label: "Email",
                   icon: Mail,

@@ -46,6 +46,12 @@ export const METADATA_COLUMNS = [
   "Last Updated At",
 ];
 
+/**
+ * Status columns written by the email CTA responses (Apps Script `respond`).
+ * Surfaced as coloured badges in the Email (and Database) tables.
+ */
+export const STATUS_COLUMNS = ["Approval", "Decline", "Negotiate"];
+
 /** localStorage keys. Swappable for a real backend later. */
 export const STORAGE_KEYS = {
   presets: "quotify.presets.v1",

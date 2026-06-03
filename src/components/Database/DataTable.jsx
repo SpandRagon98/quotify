@@ -1,11 +1,22 @@
+import StatusBadge from "./StatusBadge";
+
 /**
  * Premium read-only data table with per-column filter inputs.
  *
  * When `rowAction` is provided, an Actions column with a button is shown per row.
  * rowAction = { label, icon: IconComponent, title, onClick(row) }
+ * `statusColumns` headers render as coloured status badges.
  */
-export default function DataTable({ headers, rows, filters, onFilterChange, rowAction }) {
+export default function DataTable({
+  headers,
+  rows,
+  filters,
+  onFilterChange,
+  rowAction,
+  statusColumns = [],
+}) {
   const ActionIcon = rowAction?.icon;
+  const isStatus = (h) => statusColumns.includes(h);
 
   return (
     <div className="table-wrap">
@@ -44,11 +55,17 @@ export default function DataTable({ headers, rows, filters, onFilterChange, rowA
                   </button>
                 </td>
               )}
-              {headers.map((h, ci) => (
-                <td key={ci} title={String(row[ci] ?? "")}>
-                  {String(row[ci] ?? "")}
-                </td>
-              ))}
+              {headers.map((h, ci) =>
+                isStatus(h) ? (
+                  <td key={ci} className="td-status">
+                    <StatusBadge value={row[ci]} />
+                  </td>
+                ) : (
+                  <td key={ci} title={String(row[ci] ?? "")}>
+                    {String(row[ci] ?? "")}
+                  </td>
+                )
+              )}
             </tr>
           ))}
         </tbody>

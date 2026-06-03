@@ -31,6 +31,7 @@ export function rowToFormValues(preset, headers, row) {
 
   const values = {};
   preset.fields.forEach((f) => {
+    if (f.calculated) return; // calculated fields are recomputed from inputs
     values[f.id] = coerceForField(f, cell(f.label));
   });
 

@@ -474,12 +474,75 @@ textarea.control { resize: vertical; }
 .placeholder-insert .placeholder-list { margin-top: 8px; max-height: 116px; overflow-y: auto; }
 .placeholder-chip-btn { cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease; }
 .placeholder-chip-btn:hover { border-color: var(--brand); background: var(--brand-soft); }
-.email-preview { margin-top: 18px; }
-.email-preview-body {
-  margin-top: 8px; white-space: pre-wrap; font-size: 13px; color: var(--text-soft);
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 14px; max-height: 180px; overflow-y: auto;
+
+/* Wide email composer */
+.modal-wide { max-width: 920px; }
+.email-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.email-compose { display: flex; flex-direction: column; gap: 14px; }
+.email-body-input { min-height: 220px; resize: vertical; }
+.email-preview-pane { display: flex; flex-direction: column; gap: 8px; }
+.email-preview-card {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  overflow: hidden; background: #fff; box-shadow: var(--shadow-sm);
 }
+.email-preview-brand { background: var(--brand); color: #fff; font-weight: 800; font-size: 18px; padding: 14px 18px; }
+.email-preview-subject { font-weight: 700; padding: 14px 18px 0; font-size: 14px; }
+.email-preview-card .email-preview-body {
+  white-space: pre-wrap; padding: 12px 18px; font-size: 13px;
+  color: var(--text-soft); max-height: 220px; overflow-y: auto;
+}
+.email-preview-ctas { display: flex; gap: 8px; padding: 0 18px 18px; flex-wrap: wrap; }
+.email-cta { padding: 8px 14px; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 700; }
+.cta-approve { background: #2b9a66; }
+.cta-decline { background: #e5484d; }
+.cta-negotiate { background: #b7791f; }
+
+/* Status badges */
+.status-badge {
+  display: inline-block; padding: 4px 10px; border-radius: 999px;
+  color: #fff; font-size: 12px; font-weight: 700; white-space: nowrap;
+}
+.status-empty { color: var(--text-muted); }
+.td-status { padding: 9px 14px; }
+
+/* ---------- Calculated fields ---------- */
+.entry-grid { display: grid; grid-template-columns: 1.5fr 0.85fr; gap: 24px; align-items: start; }
+.calc-panel { position: sticky; top: 24px; }
+.calc-panel-title { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; font-size: 16px; font-weight: 700; }
+.calc-list { display: flex; flex-direction: column; gap: 10px; }
+.calc-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.calc-row-label { font-size: 13px; color: var(--text-soft); font-weight: 600; }
+.calc-row-value { font-size: 16px; font-weight: 800; color: var(--brand-700); }
+
+.calc-badge {
+  display: inline-flex; align-items: center; gap: 4px; margin-left: 8px;
+  font-size: 11px; font-weight: 700; color: var(--brand-700);
+  background: var(--brand-soft); padding: 2px 8px; border-radius: 999px;
+}
+.calc-config {
+  margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border-strong);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.calc-field-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.calc-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 600; color: var(--brand-700);
+  background: var(--brand-soft); border: 1px solid #d7daff; border-radius: 999px;
+  padding: 5px 10px; cursor: pointer;
+}
+.calc-chip:hover { background: #e3e6ff; }
+.field-editor-foot { display: flex; gap: 24px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+.field-editor-foot .toggle-row { margin-top: 0; }
+.review-item-calc { border-color: #d7daff; background: var(--brand-soft); }
+.review-item-calc .review-value { color: var(--brand-700); }
+
+/* ---------- Collapsed sidebar fix ---------- */
+.brand-mark { flex-shrink: 0; }
+.app.is-collapsed .sidebar-top { flex-direction: column; gap: 12px; }
 
 /* ---------- Misc ---------- */
 .spin { animation: spin 0.8s linear infinite; }
@@ -501,8 +564,16 @@ textarea.control { resize: vertical; }
   .app.is-collapsed .brand-text { display: flex; }
   .app.is-collapsed .nav-label { display: inline; }
   .app.is-collapsed .nav-item { justify-content: center; padding: 11px 14px; }
+  .app.is-collapsed .sidebar-top { flex-direction: row; }
   .content { padding: 24px 20px; }
   .stat-row { grid-template-columns: 1fr; }
+}
+@media (max-width: 1040px) {
+  .entry-grid { grid-template-columns: 1fr; }
+  .calc-panel { position: static; }
+}
+@media (max-width: 760px) {
+  .email-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
   .form-grid, .field-editor-grid, .review-grid { grid-template-columns: 1fr; }

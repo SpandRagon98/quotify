@@ -15,9 +15,10 @@ import {
   defaultEmailTemplate,
 } from "../../utils/emailTemplate";
 import { sendQuotationEmail } from "../../services/emailService";
+import { presetSheetId } from "../../services/quotationService";
 
 /**
- * Compose + send an email for one Database row.
+ * Wide two-pane email composer for one Database row.
  * Placeholders ({{Header}}) are replaced with that row's values on send.
  */
 export default function EmailModal({
@@ -53,7 +54,6 @@ export default function EmailModal({
     const start = el.selectionStart ?? el.value.length;
     const end = el.selectionEnd ?? el.value.length;
     setter((v) => v.slice(0, start) + token + v.slice(end));
-    // Restore caret after the inserted token.
     requestAnimationFrame(() => {
       el.focus();
       const pos = start + token.length;
@@ -77,10 +77,11 @@ export default function EmailModal({
         to: recipient,
         subject: applyPlaceholders(subject, headers, row),
         body: applyPlaceholders(body, headers, row),
-        quotationId: headers.indexOf("Quotation ID") !== -1
-          ? row[headers.indexOf("Quotation ID")]
-          : "",
+        quotationId:
+          headers.indexOf("Quotation ID") !== -1 ? row[headers.indexOf("Quotation ID")] : "",
         presetName: preset.name,
+        spreadsheetId: presetSheetId(preset),
+        sheetTabName: preset.sheetTabName,
       });
       setStatus({ state: "sent", message: `Email sent to ${recipient}.` });
     } catch (err) {
@@ -88,11 +89,13 @@ export default function EmailModal({
     }
   };
 
-  const preview = row ? applyPlaceholders(body, headers, row) : body;
+  const previewSubject = row ? applyPlaceholders(subject, headers, row) : subject;
+  const previewBody = row ? applyPlaceholders(body, headers, row) : body;
 
   return (
     <Modal
       open={open}
+      wide
       title="Compose email"
       onClose={onClose}
       footer={
@@ -117,54 +120,69 @@ export default function EmailModal({
         )}
       </div>
 
-      <label className="form-field">
-        <span className="form-label">Subject</span>
-        <input
-          ref={subjectRef}
-          className="control"
-          value={subject}
-          onFocus={() => (lastFocused.current = "subject")}
-          onChange={(e) => setSubject(e.target.value)}
-        />
-      </label>
+      <div className="email-grid">
+        {/* Compose pane */}
+        <div className="email-compose">
+          <label className="form-field">
+            <span className="form-label">Subject</span>
+            <input
+              ref={subjectRef}
+              className="control"
+              value={subject}
+              onFocus={() => (lastFocused.current = "subject")}
+              onChange={(e) => setSubject(e.target.value)}
+            />
+          </label>
 
-      <label className="form-field">
-        <span className="form-label">Body</span>
-        <textarea
-          ref={bodyRef}
-          className="control"
-          rows={7}
-          value={body}
-          onFocus={() => (lastFocused.current = "body")}
-          onChange={(e) => setBody(e.target.value)}
-        />
-      </label>
+          <label className="form-field">
+            <span className="form-label">Body</span>
+            <textarea
+              ref={bodyRef}
+              className="control email-body-input"
+              rows={12}
+              value={body}
+              onFocus={() => (lastFocused.current = "body")}
+              onChange={(e) => setBody(e.target.value)}
+            />
+          </label>
 
-      <div className="placeholder-insert">
-        <span className="form-label">Insert placeholder</span>
-        <div className="placeholder-list">
-          {headers.map((h) => (
-            <button
-              key={h}
-              type="button"
-              className="placeholder-chip placeholder-chip-btn"
-              onClick={() => insertToken(`{{${h}}}`)}
-              title={`Insert {{${h}}}`}
-            >
-              <code>{`{{${h}}}`}</code>
-              <Copy size={13} />
-            </button>
-          ))}
+          <div className="placeholder-insert">
+            <span className="form-label">Insert placeholder</span>
+            <div className="placeholder-list">
+              {headers.map((h) => (
+                <button
+                  key={h}
+                  type="button"
+                  className="placeholder-chip placeholder-chip-btn"
+                  onClick={() => insertToken(`{{${h}}}`)}
+                  title={`Insert {{${h}}}`}
+                >
+                  <code>{`{{${h}}}`}</code>
+                  <Copy size={13} />
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="email-preview">
-        <span className="form-label">Preview (with this row's values)</span>
-        <div className="email-preview-body">{preview}</div>
-        <p className="form-hint">
-          Quotify branding and the <strong>Approve / Decline / Negotiate</strong> buttons
-          are added automatically when the email is sent.
-        </p>
+        {/* Preview pane */}
+        <div className="email-preview-pane">
+          <span className="form-label">Live preview</span>
+          <div className="email-preview-card">
+            <div className="email-preview-brand">Quotify</div>
+            <div className="email-preview-subject">{previewSubject || "(no subject)"}</div>
+            <div className="email-preview-body">{previewBody}</div>
+            <div className="email-preview-ctas">
+              <span className="email-cta cta-approve">Approve</span>
+              <span className="email-cta cta-decline">Decline</span>
+              <span className="email-cta cta-negotiate">Negotiate</span>
+            </div>
+          </div>
+          <p className="form-hint">
+            Quotify branding and the Approve / Decline / Negotiate buttons are added
+            automatically. Clicking them updates this record's status.
+          </p>
+        </div>
       </div>
 
       {status.state !== "idle" && (

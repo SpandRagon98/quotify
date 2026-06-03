@@ -11,7 +11,15 @@
 import { METADATA_COLUMNS } from "../config/appConfig";
 import { generateQuotationId } from "../utils/idGenerator";
 import { valueForExport } from "../utils/fieldFormatters";
+import { computeCalculatedValues, formatCalculated } from "../utils/formula";
 import { extractId } from "../utils/googleLinks";
+
+/** Export value for a field, computing calculated fields from the inputs. */
+function exportFieldValue(field, values, calcValues) {
+  return field.calculated
+    ? formatCalculated(calcValues[field.id], field)
+    : valueForExport(field, values[field.id]);
+}
 import {
   appendQuotationRow,
   updateQuotationRow,
@@ -37,11 +45,12 @@ export function presetDocId(preset) {
 
 /** Build the dynamic Sheets payload (headers + aligned row). */
 export function buildSheetPayload(preset, values, meta) {
+  const calcValues = computeCalculatedValues(preset, values);
   const fieldHeaders = preset.fields.map((f) => f.label);
   const headers = [...METADATA_COLUMNS, ...fieldHeaders];
 
   const metaRow = [meta.quotationId, preset.name, meta.createdAt, meta.updatedAt];
-  const fieldRow = preset.fields.map((f) => valueForExport(f, values[f.id]));
+  const fieldRow = preset.fields.map((f) => exportFieldValue(f, values, calcValues));
 
   return {
     spreadsheetId: presetSheetId(preset),
@@ -55,8 +64,8 @@ export function buildSheetPayload(preset, values, meta) {
     // Structured copy, handy for debugging / future Apps Script logic.
     fields: preset.fields.map((f) => ({
       label: f.label,
-      type: f.type,
-      value: valueForExport(f, values[f.id]),
+      type: f.calculated ? "calculated" : f.type,
+      value: exportFieldValue(f, values, calcValues),
     })),
   };
 }
@@ -66,13 +75,14 @@ export function buildSheetPayload(preset, values, meta) {
  * Values come straight from the entered form — the doc does NOT read the Sheet.
  */
 export function buildDocPayload(preset, values, meta) {
+  const calcValues = computeCalculatedValues(preset, values);
   const placeholders = {
     "Quotation ID": meta.quotationId,
     "Preset Name": preset.name,
     "Created At": meta.createdAt,
   };
   preset.fields.forEach((f) => {
-    placeholders[f.label] = valueForExport(f, values[f.id]);
+    placeholders[f.label] = exportFieldValue(f, values, calcValues);
   });
 
   return {

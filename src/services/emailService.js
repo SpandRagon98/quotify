@@ -17,8 +17,18 @@ import { postAction, assertAction } from "./appsScriptClient";
  * @param {string} params.body - plain text, placeholders already replaced
  * @param {string} [params.quotationId]
  * @param {string} [params.presetName]
+ * @param {string} [params.spreadsheetId] - lets the CTA links update this sheet
+ * @param {string} [params.sheetTabName]
  */
-export async function sendQuotationEmail({ to, subject, body, quotationId, presetName }) {
+export async function sendQuotationEmail({
+  to,
+  subject,
+  body,
+  quotationId,
+  presetName,
+  spreadsheetId,
+  sheetTabName,
+}) {
   if (!to) {
     throw new Error("No email address found in this row — add/fill an email field.");
   }
@@ -34,6 +44,8 @@ export async function sendQuotationEmail({ to, subject, body, quotationId, prese
     body,
     quotationId: quotationId || "",
     presetName: presetName || "",
+    spreadsheetId: spreadsheetId || "",
+    sheetTabName: sheetTabName || "",
   });
   assertAction(result, "sendEmail");
   return result;

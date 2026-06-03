@@ -11,6 +11,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { formatFieldValue } from "../../utils/fieldFormatters";
+import { computeCalculatedValues, formatCalculated } from "../../utils/formula";
 import {
   submitQuotation,
   updateQuotation,
@@ -29,6 +30,7 @@ export default function QuotationPreview({
   const [status, setStatus] = useState({ state: "idle", message: "" });
   const [result, setResult] = useState(null);
 
+  const calcValues = computeCalculatedValues(preset, values);
   const isEditMode = Boolean(editingQuotationId);
 
   const run = async (generateDoc) => {
@@ -101,10 +103,12 @@ export default function QuotationPreview({
       >
         <div className="review-grid">
           {preset.fields.map((field) => (
-            <div className="review-item" key={field.id}>
+            <div className={`review-item ${field.calculated ? "review-item-calc" : ""}`} key={field.id}>
               <span className="review-label">{field.label}</span>
               <span className="review-value">
-                {formatFieldValue(field, values[field.id])}
+                {field.calculated
+                  ? formatCalculated(calcValues[field.id], field)
+                  : formatFieldValue(field, values[field.id])}
               </span>
             </div>
           ))}

@@ -85,8 +85,19 @@ The script wraps the body in branded Quotify HTML and appends the
   "subject": "Your quotation from Quotify — QTF-LXY12-AB3C",
   "body": "Hello,\n\nPlease find your quotation...",
   "quotationId": "QTF-LXY12-AB3C",
-  "presetName": "Standard Quotation"
+  "presetName": "Standard Quotation",
+  "spreadsheetId": "<sheet id>",
+  "sheetTabName": "Standard Quotation"
 }
+```
+`spreadsheetId` + `sheetTabName` let the email's Approve/Decline/Negotiate buttons
+link back to this Web App and update the row's status.
+
+### Record an email response (`GET ?action=respond`)
+Opened when a customer clicks a CTA in the email — returns a branded HTML page and
+writes the decision into the **Approval / Decline / Negotiate** column of the row.
+```
+GET <web-app-url>?action=respond&spreadsheetId=<id>&sheetTabName=Standard%20Quotation&quotationId=QTF-LXY12-AB3C&decision=Approved
 ```
 
 ### Read sheet data for the Database tab (`GET ?action=getSheetData`)
@@ -124,6 +135,7 @@ function doGet(e) {
   try {
     var p = e.parameter || {};
     if (p.action === "getSheetData") return json(getSheetData(p));
+    if (p.action === "respond") return respondPage(p); // email CTA click → HTML page
     return json({ success: false, error: "Unknown action: " + p.action });
   } catch (err) {
     return json({ success: false, error: String(err) });
@@ -225,7 +237,12 @@ function updateRow(body) {
   valueMap["Quotation ID"] = body.quotationId;
   valueMap["Last Updated At"] = new Date().toISOString();
 
-  var rowOut = merged.map(function (h) { return valueMap[h] !== undefined ? valueMap[h] : ""; });
+  // Preserve any existing column not present in the payload (e.g. status columns).
+  var existingRow = values[target];
+  var rowOut = merged.map(function (h, idx) {
+    if (valueMap[h] !== undefined) return valueMap[h];
+    return idx < existingRow.length ? existingRow[idx] : "";
+  });
   sheet.getRange(target + 1, 1, 1, merged.length).setValues([rowOut]);
 
   return {
@@ -290,19 +307,22 @@ function escapeRegex(s) {
 function sendEmail(body) {
   if (!body.to) return { success: false, error: "Missing recipient email." };
 
-  var owner = Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail();
   var quoteId = body.quotationId || "";
   var subject = body.subject || ("Quotation " + quoteId);
+  var webAppUrl = ScriptApp.getService().getUrl(); // this deployment's URL
 
   var safe = String(body.body || "")
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   var bodyHtml = safe.replace(/\n/g, "<br>");
 
+  // CTAs are HTTP links back to this Web App; clicking records the decision.
   function cta(label, decision, color) {
-    var mailto = "mailto:" + owner +
-      "?subject=" + encodeURIComponent("Quotation " + quoteId + " - " + decision) +
-      "&body=" + encodeURIComponent("I would like to " + decision.toLowerCase() + " this quotation.");
-    return '<a href="' + mailto + '" style="display:inline-block;padding:10px 18px;margin:4px;' +
+    var url = webAppUrl + "?action=respond" +
+      "&spreadsheetId=" + encodeURIComponent(body.spreadsheetId || "") +
+      "&sheetTabName=" + encodeURIComponent(body.sheetTabName || "") +
+      "&quotationId=" + encodeURIComponent(quoteId) +
+      "&decision=" + encodeURIComponent(decision);
+    return '<a href="' + url + '" style="display:inline-block;padding:10px 18px;margin:4px;' +
       'border-radius:8px;background:' + color + ';color:#fff;text-decoration:none;font-weight:600;">' +
       label + '</a>';
   }
@@ -316,13 +336,83 @@ function sendEmail(body) {
         '<div style="margin-top:24px;text-align:center;">' +
           cta("Approve", "Approved", "#2b9a66") +
           cta("Decline", "Declined", "#e5484d") +
-          cta("Negotiate", "Negotiate", "#635bff") +
+          cta("Negotiate", "Negotiate", "#b7791f") +
         '</div>' +
         '<p style="margin-top:24px;font-size:12px;color:#8c91a3;">Sent via Quotify</p>' +
       '</div></div>';
 
   GmailApp.sendEmail(body.to, subject, body.body || "", { htmlBody: html, name: "Quotify" });
   return { success: true, action: "sendEmail", to: body.to };
+}
+
+/**
+ * Record an Approve / Decline / Negotiate response against a quotation row.
+ * Ensures the Approval / Decline / Negotiate columns exist, sets the chosen one
+ * and clears the others. Located by Quotation ID.
+ */
+function setStatus(p) {
+  if (!p.quotationId) throw new Error("Missing quotationId");
+
+  var ss = p.spreadsheetId
+    ? SpreadsheetApp.openById(p.spreadsheetId)
+    : SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(p.sheetTabName);
+  if (!sheet) throw new Error("Sheet tab not found: " + p.sheetTabName);
+
+  var values = sheet.getDataRange().getValues();
+  var headerRow = values[0].map(String);
+  var merged = headerRow.slice();
+  ["Approval", "Decline", "Negotiate"].forEach(function (c) {
+    if (merged.indexOf(c) === -1) merged.push(c);
+  });
+  if (merged.length !== headerRow.length) {
+    sheet.getRange(1, 1, 1, merged.length).setValues([merged]);
+  }
+
+  var idCol = merged.indexOf("Quotation ID");
+  if (idCol === -1) throw new Error("No 'Quotation ID' column found.");
+
+  var target = -1;
+  for (var r = 1; r < values.length; r++) {
+    if (String(values[r][idCol]) === String(p.quotationId)) { target = r; break; }
+  }
+  if (target === -1) throw new Error("Quotation not found: " + p.quotationId);
+
+  function setCell(name, val) {
+    var c = merged.indexOf(name);
+    if (c !== -1) sheet.getRange(target + 1, c + 1).setValue(val);
+  }
+  // One decision is active at a time.
+  setCell("Approval", "");
+  setCell("Decline", "");
+  setCell("Negotiate", "");
+  if (p.decision === "Approved") setCell("Approval", "Approved");
+  else if (p.decision === "Declined") setCell("Decline", "Declined");
+  else if (p.decision === "Negotiate") setCell("Negotiate", "Negotiate");
+
+  return p.decision;
+}
+
+/** HTML thank-you page shown after a customer clicks an email CTA. */
+function respondPage(p) {
+  var decision;
+  try {
+    decision = setStatus(p);
+  } catch (err) {
+    return HtmlService.createHtmlOutput(
+      '<div style="font-family:Arial;max-width:480px;margin:40px auto;text-align:center;">' +
+      '<h2 style="color:#635bff;">Quotify</h2><p>Could not record your response: ' +
+      err.message + '</p></div>');
+  }
+  var color = decision === "Approved" ? "#2b9a66" : decision === "Declined" ? "#e5484d" : "#b7791f";
+  return HtmlService.createHtmlOutput(
+    '<div style="font-family:Arial;max-width:480px;margin:40px auto;text-align:center;">' +
+      '<div style="background:#635bff;color:#fff;font-weight:800;font-size:22px;padding:16px;border-radius:12px 12px 0 0;">Quotify</div>' +
+      '<div style="border:1px solid #e7e8ee;border-top:none;border-radius:0 0 12px 12px;padding:28px;">' +
+        '<div style="display:inline-block;background:' + color + ';color:#fff;padding:8px 18px;border-radius:999px;font-weight:700;">' + decision + '</div>' +
+        '<p style="margin-top:18px;color:#565b6e;">Thank you — your response for quotation <b>' +
+        (p.quotationId || "") + '</b> has been recorded.</p>' +
+      '</div></div>');
 }
 ```
 
@@ -345,8 +435,12 @@ function sendEmail(body) {
   overwrites it — the quotation number stays the same and no duplicate is created.
 - **Email tab (Gmail):** `sendEmail` uses `GmailApp`, which needs the Gmail scope.
   After pasting the script, run any function once (or re-deploy) and **accept the
-  new Gmail permission** when prompted. Emails are sent from the deploying account;
-  the Approve/Decline/Negotiate buttons reply to that same account.
+  new Gmail permission** when prompted. Emails are sent from the deploying account.
+- **Status buttons:** the Approve / Decline / Negotiate buttons are HTTP links back
+  to this Web App (`respond`). Clicking writes the decision into the row's
+  **Approval / Decline / Negotiate** column, which then shows as a coloured badge in
+  the Email/Database tables. `updateRow` preserves these columns, so editing a
+  quotation later won't erase a recorded status.
 - **Doc View tab:** embeds `https://docs.google.com/document/d/<id>/preview`, so the
   preset's Google Doc must be shared (at least *Anyone with the link can view*).
 - **Global fallback:** `GOOGLE.SPREADSHEET_ID` in `appConfig.js` is only used when

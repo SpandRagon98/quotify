@@ -1,18 +1,23 @@
 /**
  * Google Sheets integration.
  *
- * Preserves the existing mechanism (POST a JSON payload to a Google Apps Script
- * Web App) but makes both the target spreadsheet AND the payload fully dynamic:
- * the preset decides which spreadsheet, which tab, and the column headers.
+ * Posts dynamic payloads to the Apps Script Web App. Both the target spreadsheet
+ * AND the columns are preset-driven: the preset decides which spreadsheet, which
+ * tab, and the header labels.
  *
- * The Apps Script side (see GOOGLE_APPS_SCRIPT_SETUP.md) is responsible for:
- *   1. opening the preset's `spreadsheetId` (falls back to the bound sheet),
- *   2. ensuring the sheet tab `sheetTabName` exists (create if missing),
- *   3. ensuring the header row matches `headers` (append any new columns),
- *   4. appending `row` aligned to those headers as a new record.
+ * Success is only reported when the response comes back from the matching
+ * handler (see appsScriptClient.assertAction) — an outdated deployment that
+ * doesn't implement these actions surfaces as a clear error instead of a fake OK.
+ *
+ * Apps Script responsibilities (see GOOGLE_APPS_SCRIPT_SETUP.md):
+ *   1. open the preset's `spreadsheetId` (fall back to the bound sheet),
+ *   2. ensure tab `sheetTabName` exists (create if missing),
+ *   3. merge `headers` into the header row (append new columns, keep old),
+ *   4. append `row` aligned to the live header order.
  */
 
 import { GOOGLE } from "../config/appConfig";
+import { postAction, getAction, assertAction } from "./appsScriptClient";
 
 /**
  * Append one quotation row to its preset's sheet tab.
@@ -25,21 +30,12 @@ export async function appendQuotationRow(payload) {
     return { success: true, mocked: true };
   }
 
-  const response = await fetch(GOOGLE.APPS_SCRIPT_URL, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({
-      action: "appendRow",
-      // payload.spreadsheetId (preset link) wins; fall back to global config.
-      spreadsheetId: payload.spreadsheetId || GOOGLE.SPREADSHEET_ID || undefined,
-      ...payload,
-    }),
+  const result = await postAction("appendRow", {
+    // payload.spreadsheetId (preset link) wins; fall back to global config.
+    spreadsheetId: payload.spreadsheetId || GOOGLE.SPREADSHEET_ID || undefined,
+    ...payload,
   });
-
-  const result = await response.json();
-  if (!result.success) {
-    throw new Error(result.error || "Failed to save to Google Sheet");
-  }
+  assertAction(result, "appendRow");
   return result;
 }
 
@@ -54,15 +50,10 @@ export async function fetchSheetData({ spreadsheetId, sheetTabName }) {
     return { headers: [], rows: [], mocked: true };
   }
 
-  const url =
-    `${GOOGLE.APPS_SCRIPT_URL}?action=getSheetData` +
-    `&spreadsheetId=${encodeURIComponent(spreadsheetId || "")}` +
-    `&sheetTabName=${encodeURIComponent(sheetTabName || "")}`;
-
-  const response = await fetch(url);
-  const result = await response.json();
-  if (!result.success) {
-    throw new Error(result.error || "Failed to load Google Sheet data");
-  }
+  const result = await getAction("getSheetData", {
+    spreadsheetId: spreadsheetId || "",
+    sheetTabName: sheetTabName || "",
+  });
+  assertAction(result, "getSheetData");
   return { headers: result.headers || [], rows: result.rows || [] };
 }

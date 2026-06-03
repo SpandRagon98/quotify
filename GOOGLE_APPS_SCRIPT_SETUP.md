@@ -6,6 +6,14 @@ The frontend sends JSON payloads with an `action` field; the script branches on 
 
 This replaces the old fixed-column logic with **dynamic tabs + dynamic headers**.
 
+> ## ⚠️ If saving "succeeds" but nothing happens, or the Database tab says "Invalid action"
+> Your deployed Web App is an **older script** that doesn't implement the
+> `appendRow`, `generateDoc`, and `getSheetData` actions below. **Replace the
+> entire script with the code in section 3 and re-deploy a new version**
+> (Deploy → Manage deployments → Edit → Version: *New version* → Deploy).
+> Each response now echoes its `action`; the Quotify frontend verifies this and
+> will no longer show a fake success against an outdated deployment.
+
 ---
 
 ## 1. Create the script
@@ -54,7 +62,10 @@ Values come straight from the entered form — **the Doc never reads the Sheet**
 ```
 GET <web-app-url>?action=getSheetData&spreadsheetId=<id>&sheetTabName=Standard%20Quotation
 ```
-Returns: `{ "success": true, "headers": [...], "rows": [[...], [...]] }`
+Returns: `{ "success": true, "action": "getSheetData", "headers": [...], "rows": [[...], [...]] }`
+
+> Every response includes its `action`. The frontend asserts this matches the
+> request, so an outdated deployment is reported as an error rather than a fake success.
 
 ---
 
@@ -68,7 +79,7 @@ function doPost(e) {
     switch (body.action) {
       case "appendRow":   return json(appendRow(body));
       case "generateDoc": return json(generateDoc(body));
-      default:            return json({ success: false, error: "Unknown action" });
+      default:            return json({ success: false, error: "Unknown action: " + body.action });
     }
   } catch (err) {
     return json({ success: false, error: String(err) });
@@ -80,7 +91,7 @@ function doGet(e) {
   try {
     var p = e.parameter || {};
     if (p.action === "getSheetData") return json(getSheetData(p));
-    return json({ success: false, error: "Unknown action" });
+    return json({ success: false, error: "Unknown action: " + p.action });
   } catch (err) {
     return json({ success: false, error: String(err) });
   }
@@ -126,7 +137,13 @@ function appendRow(body) {
   var rowOut = merged.map(function (h) { return valueMap[h] !== undefined ? valueMap[h] : ""; });
 
   sheet.appendRow(rowOut);
-  return { success: true, sheetTabName: body.sheetTabName, columns: merged.length };
+  return {
+    success: true,
+    action: "appendRow",
+    sheetTabName: body.sheetTabName,
+    rowNumber: sheet.getLastRow(),
+    columns: merged.length
+  };
 }
 
 /**
@@ -139,14 +156,14 @@ function getSheetData(p) {
     : SpreadsheetApp.getActiveSpreadsheet();
 
   var sheet = ss.getSheetByName(p.sheetTabName);
-  if (!sheet) return { success: true, headers: [], rows: [] };
+  if (!sheet) return { success: true, action: "getSheetData", headers: [], rows: [] };
 
   var values = sheet.getDataRange().getValues();
-  if (values.length === 0) return { success: true, headers: [], rows: [] };
+  if (values.length === 0) return { success: true, action: "getSheetData", headers: [], rows: [] };
 
   var headers = values[0].map(String);
   var rows = values.slice(1);
-  return { success: true, headers: headers, rows: rows };
+  return { success: true, action: "getSheetData", headers: headers, rows: rows };
 }
 
 /**
@@ -166,7 +183,7 @@ function generateDoc(body) {
   });
 
   doc.saveAndClose();
-  return { success: true, docUrl: copy.getUrl(), docId: copy.getId() };
+  return { success: true, action: "generateDoc", docUrl: copy.getUrl(), docId: copy.getId() };
 }
 
 function escapeRegex(s) {
@@ -182,9 +199,12 @@ function escapeRegex(s) {
   Doc links (set via *Link Google Sheet* / *Link Google Doc* in the preset editor).
   The frontend sends the preset's `spreadsheetId` and `templateId` on every call,
   so one Web App deployment serves all presets.
-- **Re-deploy required:** since `doGet` was added for the Database tab, create a
-  **new deployment version** (Deploy → Manage deployments → Edit → New version),
-  otherwise `getSheetData` returns "Unknown action".
+- **Re-deploy required:** editing the script is not enough — Apps Script Web Apps
+  serve the last *deployed* version. After pasting, **Deploy → Manage deployments →
+  Edit (✏️) → Version: New version → Deploy**. Skipping this is the #1 cause of
+  "Invalid action" / saves that don't appear in the sheet.
+- **Doc template sharing:** the Google Doc template must be accessible to the
+  account running the script (the owner) — otherwise `generateDoc` can't copy it.
 - **Global fallback:** `GOOGLE.SPREADSHEET_ID` in `appConfig.js` is only used when
   a preset has no linked sheet; normally you can leave it blank.
 - **Offline testing:** set `GOOGLE.ENABLED = false` in `appConfig.js` to log

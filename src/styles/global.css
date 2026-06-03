@@ -397,6 +397,20 @@ textarea.control { resize: vertical; }
 .data-table tbody tr:hover { background: var(--surface-2); }
 .data-table tbody tr:last-child td { border-bottom: none; }
 
+/* ---------- Generated doc link ---------- */
+.doc-link-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); box-shadow: var(--shadow-sm);
+  padding: 16px 18px; margin-bottom: 18px; flex-wrap: wrap;
+}
+.doc-link-label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.doc-link-url {
+  font-size: 14px; font-weight: 600; color: var(--brand-700);
+  word-break: break-all; text-decoration: none;
+}
+.doc-link-url:hover { text-decoration: underline; }
+
 /* ---------- Misc ---------- */
 .spin { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

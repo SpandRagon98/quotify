@@ -71,11 +71,24 @@ export default function QuotationPreview({ preset, values, onBack }) {
           {status.state === "saving" && <Loader2 size={18} className="spin" />}
           {status.state === "success" && <CheckCircle2 size={18} />}
           <span>{status.message}</span>
-          {result?.docResult?.docUrl ? (
-            <a className="alert-link" href={result.docResult.docUrl} target="_blank" rel="noreferrer">
-              Open document
+        </motion.div>
+      )}
+
+      {status.state === "success" && result?.docResult?.docUrl && (
+        <motion.div
+          className="doc-link-card"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div>
+            <div className="doc-link-label">Generated Google Doc</div>
+            <a href={result.docResult.docUrl} target="_blank" rel="noreferrer" className="doc-link-url">
+              {result.docResult.docUrl}
             </a>
-          ) : null}
+          </div>
+          <a className="btn btn-primary" href={result.docResult.docUrl} target="_blank" rel="noreferrer">
+            <FileText size={16} /> Open document
+          </a>
         </motion.div>
       )}
 

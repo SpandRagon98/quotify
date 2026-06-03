@@ -50,4 +50,6 @@ export const METADATA_COLUMNS = [
 export const STORAGE_KEYS = {
   presets: "quotify.presets.v1",
   config: "quotify.config.v1",
+  emailTemplates: "quotify.emailTemplates.v1",
+  sidebarCollapsed: "quotify.sidebarCollapsed.v1",
 };

@@ -1,17 +1,18 @@
-import { SquarePen } from "lucide-react";
-
 /**
  * Premium read-only data table with per-column filter inputs.
- * When `onLoadRow` is provided, an Actions column with a "Load" button is shown
- * so a saved quotation can be loaded back into its form for editing.
+ *
+ * When `rowAction` is provided, an Actions column with a button is shown per row.
+ * rowAction = { label, icon: IconComponent, title, onClick(row) }
  */
-export default function DataTable({ headers, rows, filters, onFilterChange, onLoadRow }) {
+export default function DataTable({ headers, rows, filters, onFilterChange, rowAction }) {
+  const ActionIcon = rowAction?.icon;
+
   return (
     <div className="table-wrap">
       <table className="data-table">
         <thead>
           <tr>
-            {onLoadRow && (
+            {rowAction && (
               <th className="th-action">
                 <div className="th-label">Actions</div>
               </th>
@@ -32,14 +33,14 @@ export default function DataTable({ headers, rows, filters, onFilterChange, onLo
         <tbody>
           {rows.map((row, ri) => (
             <tr key={ri}>
-              {onLoadRow && (
+              {rowAction && (
                 <td className="td-action">
                   <button
                     className="btn btn-soft btn-xs"
-                    onClick={() => onLoadRow(row)}
-                    title="Load this quotation into the form for editing"
+                    onClick={() => rowAction.onClick(row)}
+                    title={rowAction.title || rowAction.label}
                   >
-                    <SquarePen size={14} /> Load
+                    {ActionIcon && <ActionIcon size={14} />} {rowAction.label}
                   </button>
                 </td>
               )}

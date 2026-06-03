@@ -1,30 +1,33 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Database as DatabaseIcon,
+  Mail,
   Search,
   RefreshCw,
-  Download,
   AlertCircle,
   Loader2,
   Link2,
-  SquarePen,
+  Inbox,
 } from "lucide-react";
-import DataTable from "./DataTable";
+import DataTable from "../Database/DataTable";
+import EmailModal from "./EmailModal";
 import { useSheetData } from "../../hooks/useSheetData";
-import { searchRows, filterRows, toCsv, downloadCsv } from "../../utils/tableData";
-import { rowToFormValues } from "../../utils/rowMapping";
+import { useEmailTemplates } from "../../hooks/useEmailTemplates";
+import { searchRows, filterRows } from "../../utils/tableData";
 
-export default function DatabasePage({ presets, initialPresetId, onEditPreset, onLoadQuotation }) {
+export default function EmailPage({ presets, initialPresetId, onEditPreset }) {
   const { presetId, setPresetId, preset, isLinked, data, state, error, reload } =
     useSheetData(presets, initialPresetId);
+  const { getTemplate, saveTemplate } = useEmailTemplates();
+
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState({});
+  const [activeRow, setActiveRow] = useState(null);
 
-  // Switching preset also clears the active search/filters.
   const handleSelectPreset = (id) => {
     setQuery("");
     setFilters({});
+    setActiveRow(null);
     setPresetId(id);
   };
 
@@ -36,24 +39,12 @@ export default function DatabasePage({ presets, initialPresetId, onEditPreset, o
   const handleFilter = (header, value) =>
     setFilters((prev) => ({ ...prev, [header]: value }));
 
-  // Load a saved row back into its preset's form for editing.
-  const handleLoadRow = (row) => {
-    if (!preset || !onLoadQuotation) return;
-    const { values, quotationId, createdAt } = rowToFormValues(preset, data.headers, row);
-    onLoadQuotation({ presetId: preset.id, values, quotationId, createdAt });
-  };
-
-  const exportCsv = () => {
-    const name = `${preset?.name || "data"}-${new Date().toISOString().slice(0, 10)}.csv`;
-    downloadCsv(name, toCsv(data.headers, visibleRows));
-  };
-
   return (
     <div className="screen screen-wide">
       <header className="screen-head">
         <div>
-          <h1 className="screen-title">Database</h1>
-          <p className="screen-sub">Browse data saved to each preset's linked Google Sheet.</p>
+          <h1 className="screen-title">Email</h1>
+          <p className="screen-sub">Send a branded quotation email for any saved record.</p>
         </div>
         <div className="head-actions">
           <select
@@ -94,13 +85,6 @@ export default function DatabasePage({ presets, initialPresetId, onEditPreset, o
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
-            <button
-              className="btn btn-soft"
-              onClick={exportCsv}
-              disabled={visibleRows.length === 0}
-            >
-              <Download size={16} /> Export CSV
-            </button>
           </div>
 
           {state === "loading" && (
@@ -115,7 +99,7 @@ export default function DatabasePage({ presets, initialPresetId, onEditPreset, o
 
           {state === "empty" && (
             <div className="empty-state">
-              <DatabaseIcon size={26} />
+              <Inbox size={26} />
               <p>No records found in this preset's sheet yet.</p>
             </div>
           )}
@@ -138,21 +122,27 @@ export default function DatabasePage({ presets, initialPresetId, onEditPreset, o
                 rows={visibleRows}
                 filters={filters}
                 onFilterChange={handleFilter}
-                rowAction={
-                  onLoadQuotation
-                    ? {
-                        label: "Load",
-                        icon: SquarePen,
-                        title: "Load this quotation into the form for editing",
-                        onClick: handleLoadRow,
-                      }
-                    : undefined
-                }
+                rowAction={{
+                  label: "Email",
+                  icon: Mail,
+                  title: "Compose an email for this record",
+                  onClick: (row) => setActiveRow(row),
+                }}
               />
             </motion.div>
           )}
         </>
       )}
+
+      <EmailModal
+        open={Boolean(activeRow)}
+        preset={preset}
+        headers={data.headers}
+        row={activeRow}
+        savedTemplate={preset ? getTemplate(preset.id) : null}
+        onClose={() => setActiveRow(null)}
+        onSaveTemplate={(tpl) => preset && saveTemplate(preset.id, tpl)}
+      />
     </div>
   );
 }

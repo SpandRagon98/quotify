@@ -7,11 +7,13 @@ import PresetEditor from "./components/PresetManager/PresetEditor";
 import DynamicForm from "./components/DynamicForm/DynamicForm";
 import QuotationPreview from "./components/QuotationPreview/QuotationPreview";
 import DatabasePage from "./components/Database/DatabasePage";
+import DocViewPage from "./components/DocView/DocViewPage";
+import EmailPage from "./components/Email/EmailPage";
 import { usePresets } from "./hooks/usePresets";
 
 /**
  * Lightweight view state machine (no router dependency).
- * view.name ∈ dashboard | presets | editor | form | preview | database
+ * view.name ∈ dashboard | presets | editor | form | preview | database | docview | email
  */
 export default function App() {
   const { presets, savePreset, deletePreset, getPreset } = usePresets();
@@ -22,12 +24,18 @@ export default function App() {
   // Top-level sidebar navigation.
   const handleNav = (key) => go(key);
 
-  const activeNav =
-    view.name === "database"
-      ? "database"
-      : view.name === "dashboard"
-      ? "dashboard"
-      : "presets";
+  // Which sidebar item is highlighted for the current view.
+  const NAV_FOR_VIEW = {
+    dashboard: "dashboard",
+    database: "database",
+    docview: "docview",
+    email: "email",
+    presets: "presets",
+    editor: "presets",
+    form: "presets",
+    preview: "presets",
+  };
+  const activeNav = NAV_FOR_VIEW[view.name] || "dashboard";
 
   const renderScreen = () => {
     switch (view.name) {
@@ -45,6 +53,24 @@ export default function App() {
                 editingCreatedAt: createdAt,
               })
             }
+          />
+        );
+
+      case "docview":
+        return (
+          <DocViewPage
+            presets={presets}
+            initialPresetId={view.presetId}
+            onEditPreset={(id) => go("editor", { presetId: id })}
+          />
+        );
+
+      case "email":
+        return (
+          <EmailPage
+            presets={presets}
+            initialPresetId={view.presetId}
+            onEditPreset={(id) => go("editor", { presetId: id })}
           />
         );
 

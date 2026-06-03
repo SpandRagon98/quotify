@@ -8,8 +8,8 @@ This replaces the old fixed-column logic with **dynamic tabs + dynamic headers**
 
 > ## ⚠️ If saving "succeeds" but nothing happens, or the Database tab says "Invalid action"
 > Your deployed Web App is an **older script** that doesn't implement the
-> `appendRow`, `updateRow`, `generateDoc`, and `getSheetData` actions below.
-> **Replace the entire script with the code in section 3 and re-deploy a new version**
+> `appendRow`, `updateRow`, `generateDoc`, `getSheetData`, and `sendEmail` actions
+> below. **Replace the entire script with the code in section 3 and re-deploy a new version**
 > (Deploy → Manage deployments → Edit → Version: *New version* → Deploy).
 > Each response now echoes its `action`; the Quotify frontend verifies this and
 > will no longer show a fake success against an outdated deployment.
@@ -74,6 +74,21 @@ Errors clearly when `quotationId` is missing or the row isn't found.
 The doc template should contain placeholders like `{{Customer Name}}`, `{{Quantity}}`.
 Values come straight from the entered form — **the Doc never reads the Sheet**.
 
+### Send a quotation email (`action: "sendEmail"`)
+The frontend sends the recipient + the placeholder-substituted subject/body.
+The script wraps the body in branded Quotify HTML and appends the
+**Approve / Decline / Negotiate** buttons before sending via Gmail.
+```json
+{
+  "action": "sendEmail",
+  "to": "customer@example.com",
+  "subject": "Your quotation from Quotify — QTF-LXY12-AB3C",
+  "body": "Hello,\n\nPlease find your quotation...",
+  "quotationId": "QTF-LXY12-AB3C",
+  "presetName": "Standard Quotation"
+}
+```
+
 ### Read sheet data for the Database tab (`GET ?action=getSheetData`)
 ```
 GET <web-app-url>?action=getSheetData&spreadsheetId=<id>&sheetTabName=Standard%20Quotation
@@ -96,6 +111,7 @@ function doPost(e) {
       case "appendRow":   return json(appendRow(body));
       case "updateRow":   return json(updateRow(body));
       case "generateDoc": return json(generateDoc(body));
+      case "sendEmail":   return json(sendEmail(body));
       default:            return json({ success: false, error: "Unknown action: " + body.action });
     }
   } catch (err) {
@@ -264,6 +280,50 @@ function generateDoc(body) {
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+/**
+ * Send a branded Quotify email via Gmail.
+ * `body` arrives with placeholders already replaced. We wrap it in branded HTML
+ * and append Approve / Decline / Negotiate buttons that reply to the SENDING
+ * account (Session user) — so no Gmail address is hardcoded.
+ */
+function sendEmail(body) {
+  if (!body.to) return { success: false, error: "Missing recipient email." };
+
+  var owner = Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail();
+  var quoteId = body.quotationId || "";
+  var subject = body.subject || ("Quotation " + quoteId);
+
+  var safe = String(body.body || "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  var bodyHtml = safe.replace(/\n/g, "<br>");
+
+  function cta(label, decision, color) {
+    var mailto = "mailto:" + owner +
+      "?subject=" + encodeURIComponent("Quotation " + quoteId + " - " + decision) +
+      "&body=" + encodeURIComponent("I would like to " + decision.toLowerCase() + " this quotation.");
+    return '<a href="' + mailto + '" style="display:inline-block;padding:10px 18px;margin:4px;' +
+      'border-radius:8px;background:' + color + ';color:#fff;text-decoration:none;font-weight:600;">' +
+      label + '</a>';
+  }
+
+  var html =
+    '<div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif;color:#14161f;">' +
+      '<div style="background:#635bff;padding:18px 24px;border-radius:12px 12px 0 0;">' +
+        '<span style="color:#fff;font-size:20px;font-weight:800;">Quotify</span></div>' +
+      '<div style="border:1px solid #e7e8ee;border-top:none;border-radius:0 0 12px 12px;padding:24px;">' +
+        '<div style="font-size:14px;line-height:1.6;">' + bodyHtml + '</div>' +
+        '<div style="margin-top:24px;text-align:center;">' +
+          cta("Approve", "Approved", "#2b9a66") +
+          cta("Decline", "Declined", "#e5484d") +
+          cta("Negotiate", "Negotiate", "#635bff") +
+        '</div>' +
+        '<p style="margin-top:24px;font-size:12px;color:#8c91a3;">Sent via Quotify</p>' +
+      '</div></div>';
+
+  GmailApp.sendEmail(body.to, subject, body.body || "", { htmlBody: html, name: "Quotify" });
+  return { success: true, action: "sendEmail", to: body.to };
+}
 ```
 
 ---
@@ -283,6 +343,12 @@ function escapeRegex(s) {
 - **Load & Update (Database tab):** clicking *Load* on a row pulls it back into
   the form; *Update* sends `updateRow`, which finds the row by `Quotation ID` and
   overwrites it — the quotation number stays the same and no duplicate is created.
+- **Email tab (Gmail):** `sendEmail` uses `GmailApp`, which needs the Gmail scope.
+  After pasting the script, run any function once (or re-deploy) and **accept the
+  new Gmail permission** when prompted. Emails are sent from the deploying account;
+  the Approve/Decline/Negotiate buttons reply to that same account.
+- **Doc View tab:** embeds `https://docs.google.com/document/d/<id>/preview`, so the
+  preset's Google Doc must be shared (at least *Anyone with the link can view*).
 - **Global fallback:** `GOOGLE.SPREADSHEET_ID` in `appConfig.js` is only used when
   a preset has no linked sheet; normally you can leave it blank.
 - **Offline testing:** set `GOOGLE.ENABLED = false` in `appConfig.js` to log

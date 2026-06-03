@@ -1,81 +1,122 @@
-# Quotify — RK Enterprise Quotation Automation App
+# Quotify
 
-A React web application for generating and managing container quotations for R.K. Enterprise. Quotations are saved to Google Sheets via Apps Script and can be exported as PDFs.
+**Quotify** is a dynamic quotation & form-builder. Instead of fixed input fields,
+you design your own **presets** — each with custom fields, its own Google Sheet
+tab, and its own Google Doc template. Fill a preset's form, preview it, then save
+to Google Sheets and/or generate a document from a Doc template.
 
-## What the app does
+## Features
 
-- Fill in client details, container specs, and optional features
-- Instantly see a live cost breakdown including GST (18%)
-- Save the quotation to Google Sheets (auto-generates a quotation number)
-- Generate and open a PDF quotation directly from the browser
-- Search previously saved quotations by client name and quotation number
-- View or regenerate the PDF for any saved quotation
+- 🧱 **Dynamic field builder** — Text, Number, Yes/No, Date, Dropdown, Long Text, Email, Phone
+- 📋 **Multiple presets** — each preset has completely independent fields
+- ✅ **Per-type validation** — required checks, number/email/phone formats, letters-only text, dropdown options
+- 🔀 **Reorder / edit / delete** fields; mark required; set defaults, placeholders & options
+- 📊 **Dynamic Google Sheets** — each preset writes to its own tab; columns are created from field labels; new fields extend columns without breaking old rows
+- 📄 **Dynamic Google Docs** — each preset maps to a Doc template; `{{Field Label}}` placeholders are filled on generate
+- 💾 **localStorage persistence** — presets are saved locally (swappable for a backend later)
+- 🎨 **Modern SaaS UI** — sidebar dashboard, smooth Framer Motion transitions, responsive layout
 
 ## Tech stack
 
-| Layer | Technology |
+| Layer | Tech |
 |---|---|
 | Framework | React 19 |
 | Build tool | Vite 8 |
-| Animations | Framer Motion |
+| Animation | Framer Motion |
 | Icons | Lucide React |
-| Backend | Google Apps Script (via fetch) |
-| Styling | Custom CSS (Montserrat font) |
+| Backend | Google Apps Script (Sheets + Docs) |
+| Storage | Browser localStorage |
 
 ## Folder structure
 
 ```
 src/
 ├── components/
-│   ├── DetailBox.jsx      # Read-only label/value display
-│   ├── Field.jsx          # Text / number / date input
-│   └── ToggleField.jsx    # Checkbox toggle card
-├── data/
-│   └── constants.js       # APPS_SCRIPT_URL, GST_PERCENT, initialForm, PRODUCT_TYPES
-├── pages/
-│   ├── QuotationPage.jsx  # Main quotation form + live preview panel
-│   └── SearchPage.jsx     # Customer search + results with PDF viewer
+│   ├── Layout/          AppLayout (sidebar + shell)
+│   ├── Dashboard/       Dashboard overview
+│   ├── PresetManager/   PresetManager (list) + PresetEditor (create/edit)
+│   ├── FieldBuilder/    FieldBuilder + FieldEditorRow (dynamic fields)
+│   ├── DynamicForm/     DynamicForm + FieldInput (renders a preset's form)
+│   └── QuotationPreview/ Review + save/generate screen
+├── services/
+│   ├── googleSheetsService.js   appendQuotationRow()
+│   ├── googleDocsService.js     generateDocument()
+│   └── quotationService.js      builds payloads + orchestrates submit
+├── hooks/
+│   └── usePresets.js    localStorage-backed preset store
+├── config/
+│   └── appConfig.js     app + Google integration config (single source)
 ├── utils/
-│   ├── api.js             # Fetch wrappers for Google Apps Script endpoints
-│   ├── calculations.js    # Pure cost calculation function (calculateQuote)
-│   └── formatters.js      # safeNumber, formatINR helpers
-├── App.css                # All component styles + responsive breakpoints
-├── App.jsx                # Root: state, API calls, page routing
-├── index.css              # Global base styles (font, reset)
-└── main.jsx               # React DOM entry point
+│   ├── validation.js    field/form/preset validation + input filtering
+│   ├── fieldFormatters.js  field-type metadata + value formatting
+│   └── idGenerator.js   IDs for presets, fields, quotations
+├── data/
+│   └── defaultPresets.js  sample presets seeded on first run
+├── styles/
+│   └── global.css       design system + all component styles
+├── App.jsx              view state machine wiring screens together
+└── main.jsx             entry point
 ```
 
-## How to install
+## Run locally
 
 ```bash
 npm install
-```
-
-## How to run locally
-
-```bash
 npm run dev
 ```
 
-Opens at `http://localhost:5173/quotify/`
+Opens at `http://localhost:5173/quotify/`.
 
-## How to build
+## Build
 
 ```bash
 npm run build
 ```
 
-Output goes to `dist/`. The base path is `/quotify/` (set in `vite.config.js`).
+Output goes to `dist/` (base path `/quotify/`, set in `vite.config.js`).
 
-## How to preview the production build
+## How dynamic presets work
 
-```bash
-npm run preview
-```
+1. **Create a preset** (Presets → New Preset): give it a name, an optional
+   description, a target **Google Sheet tab name**, and an optional **Google Doc
+   template link/ID**.
+2. **Add fields** with the field builder: pick a type, label, required flag,
+   default, placeholder, and (for dropdowns) options. Reorder with the arrows.
+3. **Save** — the preset is stored in localStorage.
+4. **Use a preset** (Dashboard tile or Presets → *Use*): the form is generated
+   from that preset's fields, validated on submit, then previewed before saving.
 
-## Deployment notes
+## How Google Sheets integration works
 
-- The app is configured for deployment under the `/quotify/` sub-path (e.g., GitHub Pages at `https://SpanDragon.github.io/quotify/`).
-- To deploy to GitHub Pages, push the `dist/` folder to the `gh-pages` branch or use the [vite-plugin-gh-pages](https://github.com/caioreix/vite-plugin-gh-pages) package.
-- The Google Apps Script URL is in `src/data/constants.js`. Keep this URL private — do not expose it in public forks.
-- No `.env` file is required; all configuration is in `src/data/constants.js`.
+- On save, `quotationService` builds a payload: `{ presetName, sheetTabName,
+  headers, row, quotationId, createdAt, updatedAt }`.
+- Headers = metadata columns (`Quotation ID`, `Preset Name`, `Created At`,
+  `Last Updated At`) + each field's label.
+- The Apps Script ensures the tab exists, merges/extends headers, and appends the
+  row aligned to the live header order — so **adding fields later won't break old
+  records**.
+
+## How Google Doc template mapping works
+
+- Each preset stores its own `docTemplateId` (link or ID).
+- On *Save & Generate Doc*, the payload sends `{ templateId, placeholders }` where
+  `placeholders` maps **field label → value**.
+- The Apps Script copies the template and replaces `{{Field Label}}` tokens,
+  returning the new document's link.
+
+## Configure new Google Sheet & Doc links
+
+All integration config lives in **`src/config/appConfig.js`**:
+
+- `GOOGLE.APPS_SCRIPT_URL` — your Apps Script Web App URL
+- `GOOGLE.SPREADSHEET_ID` — optional specific spreadsheet (blank = script's bound sheet)
+- `GOOGLE.ENABLED` — set `false` to test the UI offline (payloads logged to console)
+- Per-preset **Doc template** is set in the UI on each preset.
+
+See **[GOOGLE_APPS_SCRIPT_SETUP.md](GOOGLE_APPS_SCRIPT_SETUP.md)** for the full
+Apps Script code and deployment steps.
+
+## Deployment
+
+A GitHub Actions workflow (`.github/workflows/deploy.yml`) builds and deploys to
+GitHub Pages on every push to `main` → `https://<user>.github.io/quotify/`.

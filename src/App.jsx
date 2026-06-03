@@ -1,86 +1,120 @@
-import { useMemo, useState } from "react";
-import "./App.css";
-import QuotationPage from "./pages/QuotationPage";
-import SearchPage from "./pages/SearchPage";
-import { initialForm } from "./data/constants";
-import { calculateQuote } from "./utils/calculations";
-import { buildPayload, saveQuotation, generatePdf } from "./utils/api";
+import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import AppLayout from "./components/Layout/AppLayout";
+import Dashboard from "./components/Dashboard/Dashboard";
+import PresetManager from "./components/PresetManager/PresetManager";
+import PresetEditor from "./components/PresetManager/PresetEditor";
+import DynamicForm from "./components/DynamicForm/DynamicForm";
+import QuotationPreview from "./components/QuotationPreview/QuotationPreview";
+import { usePresets } from "./hooks/usePresets";
 
+/**
+ * Lightweight view state machine (no router dependency).
+ * view.name ∈ dashboard | presets | editor | form | preview
+ */
 export default function App() {
-  const [page, setPage] = useState("quotation");
-  const [form, setForm] = useState(initialForm);
-  const [status, setStatus] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [pdfGenerating, setPdfGenerating] = useState(false);
+  const { presets, savePreset, deletePreset, getPreset } = usePresets();
+  const [view, setView] = useState({ name: "dashboard" });
 
-  const calculations = useMemo(() => calculateQuote(form), [form]);
-  const payload = useMemo(() => buildPayload(form, calculations), [form, calculations]);
+  const go = (name, extra = {}) => setView({ name, ...extra });
 
-  const resetForm = () => {
-    setForm({
-      ...initialForm,
-      quotationNumber: "",
-      quotationDate: new Date().toISOString().split("T")[0],
-    });
-    setStatus("Form reset.");
+  // Top-level sidebar navigation.
+  const handleNav = (key) => go(key === "presets" ? "presets" : "dashboard");
+
+  const activeNav =
+    view.name === "dashboard" ? "dashboard" : "presets";
+
+  const renderScreen = () => {
+    switch (view.name) {
+      case "presets":
+        return (
+          <PresetManager
+            presets={presets}
+            onCreate={() => go("editor", { presetId: null })}
+            onEdit={(id) => go("editor", { presetId: id })}
+            onDelete={deletePreset}
+            onOpenForm={(id) => go("form", { presetId: id })}
+          />
+        );
+
+      case "editor":
+        return (
+          <PresetEditor
+            preset={view.presetId ? getPreset(view.presetId) : null}
+            onSave={(preset) => {
+              savePreset(preset);
+              go("presets");
+            }}
+            onCancel={() => go("presets")}
+          />
+        );
+
+      case "form": {
+        const preset = getPreset(view.presetId);
+        if (!preset) return fallback(() => go("presets"));
+        return (
+          <DynamicForm
+            preset={preset}
+            presets={presets}
+            onSelectPreset={(id) => go("form", { presetId: id })}
+            onPreview={(values) => go("preview", { presetId: preset.id, values })}
+            onEdit={(id) => go("editor", { presetId: id })}
+            onBack={() => go("dashboard")}
+          />
+        );
+      }
+
+      case "preview": {
+        const preset = getPreset(view.presetId);
+        if (!preset) return fallback(() => go("presets"));
+        return (
+          <QuotationPreview
+            preset={preset}
+            values={view.values}
+            onBack={() => go("form", { presetId: preset.id })}
+          />
+        );
+      }
+
+      case "dashboard":
+      default:
+        return (
+          <Dashboard
+            presets={presets}
+            onCreatePreset={() => go("editor", { presetId: null })}
+            onOpenForm={(id) => go("form", { presetId: id })}
+            onManagePresets={() => go("presets")}
+          />
+        );
+    }
   };
-
-  const saveToGoogleSheet = async () => {
-    if (!form.clientName || !form.projectLocation) {
-      setStatus("Please fill client name and address before saving.");
-      return;
-    }
-    try {
-      setSaving(true);
-      setStatus("Saving quotation details and generating quotation number...");
-      const result = await saveQuotation(payload);
-      setForm((prev) => ({ ...prev, quotationNumber: result.quotationNumber || "" }));
-      setStatus(
-        `Quotation saved successfully.${
-          result.quotationNumber ? ` Generated quotation number: ${result.quotationNumber}` : ""
-        }`
-      );
-    } catch (error) {
-      setStatus(`Could not save to Google Sheet. ${error.message}`);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const generateQuotationPdf = async () => {
-    if (!form.quotationNumber) {
-      setStatus("Please save the quotation first before generating PDF.");
-      return;
-    }
-    try {
-      setPdfGenerating(true);
-      setStatus("Generating quotation PDF...");
-      const result = await generatePdf(form.quotationNumber);
-      setStatus("Quotation PDF generated successfully.");
-      window.open(result.pdfUrl, "_blank");
-    } catch (error) {
-      setStatus(`Could not generate quotation PDF. ${error.message}`);
-    } finally {
-      setPdfGenerating(false);
-    }
-  };
-
-  if (page === "search") {
-    return <SearchPage onNavigateBack={() => setPage("quotation")} />;
-  }
 
   return (
-    <QuotationPage
-      form={form}
-      setForm={setForm}
-      calculations={calculations}
-      status={status}
-      saving={saving}
-      pdfGenerating={pdfGenerating}
-      onSave={saveToGoogleSheet}
-      onGeneratePdf={generateQuotationPdf}
-      onNavigateSearch={() => setPage("search")}
-      onReset={resetForm}
-    />
+    <AppLayout active={activeNav} onNavigate={handleNav}>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={view.name + (view.presetId || "")}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.22 }}
+        >
+          {renderScreen()}
+        </motion.div>
+      </AnimatePresence>
+    </AppLayout>
+  );
+}
+
+function fallback(onBack) {
+  return (
+    <div className="screen">
+      <div className="empty-state">
+        <p>That preset no longer exists.</p>
+        <button className="btn btn-primary" onClick={onBack}>
+          Back to presets
+        </button>
+      </div>
+    </div>
   );
 }

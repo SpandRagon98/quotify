@@ -12,9 +12,10 @@ import {
 import DataTable from "./DataTable";
 import { fetchPresetData } from "../../services/quotationService";
 import { searchRows, filterRows, toCsv, downloadCsv } from "../../utils/tableData";
+import { rowToFormValues } from "../../utils/rowMapping";
 
-export default function DatabasePage({ presets, onEditPreset }) {
-  const [presetId, setPresetId] = useState(presets[0]?.id || "");
+export default function DatabasePage({ presets, initialPresetId, onEditPreset, onLoadQuotation }) {
+  const [presetId, setPresetId] = useState(initialPresetId || presets[0]?.id || "");
   const [data, setData] = useState({ headers: [], rows: [] });
   const [state, setState] = useState("idle"); // idle | loading | loaded | error | empty
   const [error, setError] = useState("");
@@ -64,6 +65,13 @@ export default function DatabasePage({ presets, onEditPreset }) {
 
   const handleFilter = (header, value) =>
     setFilters((prev) => ({ ...prev, [header]: value }));
+
+  // Load a saved row back into its preset's form for editing.
+  const handleLoadRow = (row) => {
+    if (!preset || !onLoadQuotation) return;
+    const { values, quotationId, createdAt } = rowToFormValues(preset, data.headers, row);
+    onLoadQuotation({ presetId: preset.id, values, quotationId, createdAt });
+  };
 
   const exportCsv = () => {
     const name = `${preset?.name || "data"}-${new Date().toISOString().slice(0, 10)}.csv`;
@@ -160,6 +168,7 @@ export default function DatabasePage({ presets, onEditPreset }) {
                 rows={visibleRows}
                 filters={filters}
                 onFilterChange={handleFilter}
+                onLoadRow={onLoadQuotation ? handleLoadRow : undefined}
               />
             </motion.div>
           )}

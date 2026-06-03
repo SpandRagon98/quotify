@@ -397,6 +397,25 @@ textarea.control { resize: vertical; }
 .data-table tbody tr:hover { background: var(--surface-2); }
 .data-table tbody tr:last-child td { border-bottom: none; }
 
+/* ---------- Edit mode ---------- */
+.edit-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  background: var(--brand-soft); border: 1px solid #d7daff;
+  border-radius: var(--radius); padding: 12px 16px; margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.edit-banner-text {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 14px; color: var(--brand-700);
+}
+.edit-banner-text strong { font-weight: 700; }
+.btn-xs { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+
+/* ---------- Table action column ---------- */
+.th-action, .td-action { white-space: nowrap; }
+.td-action { padding: 11px 14px; }
+.data-table .th-action { vertical-align: top; }
+
 /* ---------- Generated doc link ---------- */
 .doc-link-card {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;

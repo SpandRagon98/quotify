@@ -8,8 +8,8 @@ This replaces the old fixed-column logic with **dynamic tabs + dynamic headers**
 
 > ## ⚠️ If saving "succeeds" but nothing happens, or the Database tab says "Invalid action"
 > Your deployed Web App is an **older script** that doesn't implement the
-> `appendRow`, `generateDoc`, and `getSheetData` actions below. **Replace the
-> entire script with the code in section 3 and re-deploy a new version**
+> `appendRow`, `updateRow`, `generateDoc`, and `getSheetData` actions below.
+> **Replace the entire script with the code in section 3 and re-deploy a new version**
 > (Deploy → Manage deployments → Edit → Version: *New version* → Deploy).
 > Each response now echoes its `action`; the Quotify frontend verifies this and
 > will no longer show a fake success against an outdated deployment.
@@ -43,6 +43,22 @@ This replaces the old fixed-column logic with **dynamic tabs + dynamic headers**
   "row": ["QTF-LXY12-AB3C","Standard Quotation","2026-06-03...","2026-06-03...","Acme","10"]
 }
 ```
+
+### Update an existing quotation row (`action: "updateRow"`)
+Same shape as `appendRow`, but the row is **located by `quotationId`** and
+overwritten in place (no new row). `Quotation ID` and `Created At` are preserved;
+`Last Updated At` is stamped server-side.
+```json
+{
+  "action": "updateRow",
+  "spreadsheetId": "<sheet id>",
+  "sheetTabName": "Standard Quotation",
+  "quotationId": "QTF-LXY12-AB3C",
+  "headers": ["Quotation ID","Preset Name","Created At","Last Updated At","Customer Name","Quantity"],
+  "row": ["QTF-LXY12-AB3C","Standard Quotation","...","...","Acme Updated","12"]
+}
+```
+Errors clearly when `quotationId` is missing or the row isn't found.
 
 ### Generate a document (`action: "generateDoc"`)
 ```json
@@ -78,6 +94,7 @@ function doPost(e) {
     var body = JSON.parse(e.postData.contents);
     switch (body.action) {
       case "appendRow":   return json(appendRow(body));
+      case "updateRow":   return json(updateRow(body));
       case "generateDoc": return json(generateDoc(body));
       default:            return json({ success: false, error: "Unknown action: " + body.action });
     }
@@ -147,6 +164,64 @@ function appendRow(body) {
 }
 
 /**
+ * Update an EXISTING row in place (no new row).
+ * Finds the row by "Quotation ID", preserves Created At, stamps Last Updated At.
+ */
+function updateRow(body) {
+  if (!body.quotationId) return { success: false, error: "Missing quotationId — cannot update." };
+
+  var ss = body.spreadsheetId
+    ? SpreadsheetApp.openById(body.spreadsheetId)
+    : SpreadsheetApp.getActiveSpreadsheet();
+
+  var sheet = ss.getSheetByName(body.sheetTabName);
+  if (!sheet) return { success: false, error: "Sheet tab not found: " + body.sheetTabName };
+
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return { success: false, error: "No data rows to update." };
+
+  // Merge in any new headers (fields added since the row was created).
+  var headerRow = values[0].map(String);
+  var merged = headerRow.slice();
+  body.headers.forEach(function (h) { if (merged.indexOf(h) === -1) merged.push(h); });
+  if (merged.length !== headerRow.length) {
+    sheet.getRange(1, 1, 1, merged.length).setValues([merged]);
+  }
+
+  var idCol = merged.indexOf("Quotation ID");
+  if (idCol === -1) return { success: false, error: "No 'Quotation ID' column found." };
+
+  // Locate the row (data starts at array index 1 → sheet row index + 1).
+  var target = -1;
+  for (var r = 1; r < values.length; r++) {
+    if (String(values[r][idCol]) === String(body.quotationId)) { target = r; break; }
+  }
+  if (target === -1) return { success: false, error: "Quotation not found: " + body.quotationId };
+
+  // Build the new row, preserving identity + creation time.
+  var valueMap = {};
+  body.headers.forEach(function (h, i) { valueMap[h] = body.row[i]; });
+
+  var createdIdx = merged.indexOf("Created At");
+  if (createdIdx !== -1 && createdIdx < values[target].length) {
+    valueMap["Created At"] = values[target][createdIdx];
+  }
+  valueMap["Quotation ID"] = body.quotationId;
+  valueMap["Last Updated At"] = new Date().toISOString();
+
+  var rowOut = merged.map(function (h) { return valueMap[h] !== undefined ? valueMap[h] : ""; });
+  sheet.getRange(target + 1, 1, 1, merged.length).setValues([rowOut]);
+
+  return {
+    success: true,
+    action: "updateRow",
+    quotationId: body.quotationId,
+    rowNumber: target + 1,
+    updatedAt: valueMap["Last Updated At"]
+  };
+}
+
+/**
  * Read a preset's linked sheet/tab for the Database tab.
  * Returns the header row + all data rows (as a 2D array).
  */
@@ -205,6 +280,9 @@ function escapeRegex(s) {
   "Invalid action" / saves that don't appear in the sheet.
 - **Doc template sharing:** the Google Doc template must be accessible to the
   account running the script (the owner) — otherwise `generateDoc` can't copy it.
+- **Load & Update (Database tab):** clicking *Load* on a row pulls it back into
+  the form; *Update* sends `updateRow`, which finds the row by `Quotation ID` and
+  overwrites it — the quotation number stays the same and no duplicate is created.
 - **Global fallback:** `GOOGLE.SPREADSHEET_ID` in `appConfig.js` is only used when
   a preset has no linked sheet; normally you can leave it blank.
 - **Offline testing:** set `GOOGLE.ENABLED = false` in `appConfig.js` to log

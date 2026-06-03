@@ -35,7 +35,16 @@ export default function App() {
         return (
           <DatabasePage
             presets={presets}
+            initialPresetId={view.presetId}
             onEditPreset={(id) => go("editor", { presetId: id })}
+            onLoadQuotation={({ presetId, values, quotationId, createdAt }) =>
+              go("form", {
+                presetId,
+                initialValues: values,
+                editingQuotationId: quotationId,
+                editingCreatedAt: createdAt,
+              })
+            }
           />
         );
 
@@ -69,10 +78,20 @@ export default function App() {
           <DynamicForm
             preset={preset}
             presets={presets}
+            initialValues={view.initialValues}
+            editingQuotationId={view.editingQuotationId}
             onSelectPreset={(id) => go("form", { presetId: id })}
-            onPreview={(values) => go("preview", { presetId: preset.id, values })}
+            onPreview={(values) =>
+              go("preview", {
+                presetId: preset.id,
+                values,
+                editingQuotationId: view.editingQuotationId,
+                editingCreatedAt: view.editingCreatedAt,
+              })
+            }
             onEdit={(id) => go("editor", { presetId: id })}
-            onBack={() => go("dashboard")}
+            onBack={() => go(view.editingQuotationId ? "database" : "dashboard")}
+            onCancelEdit={() => go("form", { presetId: preset.id })}
           />
         );
       }
@@ -84,7 +103,18 @@ export default function App() {
           <QuotationPreview
             preset={preset}
             values={view.values}
-            onBack={() => go("form", { presetId: preset.id })}
+            editingQuotationId={view.editingQuotationId}
+            editingCreatedAt={view.editingCreatedAt}
+            onBack={() =>
+              go("form", {
+                presetId: preset.id,
+                // Preserve entered values + edit context when going back.
+                initialValues: view.values,
+                editingQuotationId: view.editingQuotationId,
+                editingCreatedAt: view.editingCreatedAt,
+              })
+            }
+            onUpdated={() => go("database", { presetId: preset.id })}
           />
         );
       }
@@ -106,7 +136,7 @@ export default function App() {
     <AppLayout active={activeNav} onNavigate={handleNav}>
       <AnimatePresence mode="wait">
         <motion.div
-          key={view.name + (view.presetId || "")}
+          key={`${view.name}:${view.presetId || ""}:${view.editingQuotationId || "new"}`}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}

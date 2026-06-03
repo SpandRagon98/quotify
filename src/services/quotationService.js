@@ -12,7 +12,11 @@ import { METADATA_COLUMNS } from "../config/appConfig";
 import { generateQuotationId } from "../utils/idGenerator";
 import { valueForExport } from "../utils/fieldFormatters";
 import { extractId } from "../utils/googleLinks";
-import { appendQuotationRow, fetchSheetData } from "./googleSheetsService";
+import {
+  appendQuotationRow,
+  updateQuotationRow,
+  fetchSheetData,
+} from "./googleSheetsService";
 import { generateDocument } from "./googleDocsService";
 
 /** Exact user-facing block messages (per spec). */
@@ -20,6 +24,8 @@ export const MSG_NO_SHEET =
   "Please link a Google Sheet for this preset before saving details.";
 export const MSG_NO_DOC =
   "Please link a Google Doc template for this preset before generating the quotation.";
+export const MSG_NO_QUOTATION_ID =
+  "Missing quotation ID — cannot update this quotation.";
 
 /** Resolve a preset's effective Sheet/Doc IDs (id field or extracted from URL). */
 export function presetSheetId(preset) {
@@ -96,6 +102,36 @@ export async function submitQuotation(preset, values, opts = {}) {
   };
 
   const sheetResult = await appendQuotationRow(buildSheetPayload(preset, values, meta));
+
+  let docResult = null;
+  if (opts.generateDoc) {
+    docResult = await generateDocument(buildDocPayload(preset, values, meta));
+  }
+
+  return { meta, sheetResult, docResult };
+}
+
+/**
+ * Update an EXISTING quotation row (no new row is created).
+ * The Apps Script locates the row by quotationId and overwrites it, preserving
+ * the original Quotation ID / Created At and stamping Last Updated At server-side.
+ * @param {object} preset
+ * @param {object} values - { [fieldId]: value }
+ * @param {string} quotationId - the existing quotation's ID (must stay the same)
+ * @param {object} [opts] - { generateDoc?: boolean, createdAt?: string }
+ */
+export async function updateQuotation(preset, values, quotationId, opts = {}) {
+  if (!presetSheetId(preset)) throw new Error(MSG_NO_SHEET);
+  if (!quotationId) throw new Error(MSG_NO_QUOTATION_ID);
+  if (opts.generateDoc && !presetDocId(preset)) throw new Error(MSG_NO_DOC);
+
+  const meta = {
+    quotationId,
+    createdAt: opts.createdAt || "",
+    updatedAt: new Date().toISOString(),
+  };
+
+  const sheetResult = await updateQuotationRow(buildSheetPayload(preset, values, meta));
 
   let docResult = null;
   if (opts.generateDoc) {

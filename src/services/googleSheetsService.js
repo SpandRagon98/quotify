@@ -40,6 +40,26 @@ export async function appendQuotationRow(payload) {
 }
 
 /**
+ * Update one EXISTING quotation row (located by Quotation ID on the backend).
+ * Does NOT create a new row.
+ * @param {object} payload - built by quotationService.buildSheetPayload
+ * @returns {Promise<{success:boolean, mocked?:boolean, [k:string]:any}>}
+ */
+export async function updateQuotationRow(payload) {
+  if (!GOOGLE.ENABLED) {
+    console.info("[Sheets mock] updateQuotationRow", payload);
+    return { success: true, mocked: true };
+  }
+
+  const result = await postAction("updateRow", {
+    spreadsheetId: payload.spreadsheetId || GOOGLE.SPREADSHEET_ID || undefined,
+    ...payload,
+  });
+  assertAction(result, "updateRow");
+  return result;
+}
+
+/**
  * Read all rows from a preset's linked spreadsheet/tab (Database tab).
  * @param {{spreadsheetId:string, sheetTabName:string}} params
  * @returns {Promise<{headers:string[], rows:Array<Array>, mocked?:boolean}>}

@@ -1,22 +1,35 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Eye, Pencil } from "lucide-react";
+import { ArrowLeft, Eye, Pencil, X } from "lucide-react";
 import FieldInput from "./FieldInput";
 import { emptyValueForField } from "../../utils/fieldFormatters";
 import { validateForm } from "../../utils/validation";
 
-function initValues(preset) {
+function initValues(preset, initialValues) {
   const values = {};
   preset.fields.forEach((f) => {
-    values[f.id] = emptyValueForField(f);
+    values[f.id] =
+      initialValues && f.id in initialValues ? initialValues[f.id] : emptyValueForField(f);
   });
   return values;
 }
 
 /** Fills values for a preset, validates, then hands off to preview. */
-export default function DynamicForm({ preset, presets, onSelectPreset, onPreview, onBack, onEdit }) {
-  const [values, setValues] = useState(() => initValues(preset));
+export default function DynamicForm({
+  preset,
+  presets,
+  initialValues,
+  editingQuotationId,
+  onSelectPreset,
+  onPreview,
+  onBack,
+  onEdit,
+  onCancelEdit,
+}) {
+  const [values, setValues] = useState(() => initValues(preset, initialValues));
   const [errors, setErrors] = useState({});
+
+  const isEditMode = Boolean(editingQuotationId);
 
   const setValue = (id, val) => {
     setValues((prev) => ({ ...prev, [id]: val }));
@@ -41,13 +54,19 @@ export default function DynamicForm({ preset, presets, onSelectPreset, onPreview
           </button>
           <div>
             <h1 className="screen-title">{preset.name}</h1>
-            <p className="screen-sub">{preset.description || "Fill in the quotation details."}</p>
+            <p className="screen-sub">
+              {isEditMode
+                ? "Editing an existing quotation."
+                : preset.description || "Fill in the quotation details."}
+            </p>
           </div>
         </div>
         <div className="head-actions">
           <select
             className="control preset-switch"
             value={preset.id}
+            disabled={isEditMode}
+            title={isEditMode ? "Preset is locked while editing a saved quotation" : ""}
             onChange={(e) => onSelectPreset(e.target.value)}
           >
             {presets.map((p) => (
@@ -59,6 +78,21 @@ export default function DynamicForm({ preset, presets, onSelectPreset, onPreview
           </button>
         </div>
       </header>
+
+      {isEditMode && (
+        <motion.div
+          className="edit-banner"
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <span className="edit-banner-text">
+            <Pencil size={15} /> Editing quotation: <strong>{editingQuotationId}</strong>
+          </span>
+          <button className="btn btn-ghost btn-xs" onClick={onCancelEdit}>
+            <X size={14} /> Cancel edit
+          </button>
+        </motion.div>
+      )}
 
       <motion.div
         key={preset.id}
@@ -81,7 +115,7 @@ export default function DynamicForm({ preset, presets, onSelectPreset, onPreview
 
         <div className="form-actions">
           <button className="btn btn-primary" onClick={handleContinue}>
-            <Eye size={18} /> Preview Quotation
+            <Eye size={18} /> {isEditMode ? "Review changes" : "Preview Quotation"}
           </button>
         </div>
       </motion.div>

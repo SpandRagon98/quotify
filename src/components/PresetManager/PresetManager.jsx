@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Pencil, Trash2, FileText, FilePlus2, FileCheck2 } from "lucide-react";
+import { Plus, Pencil, Trash2, FileText, Sheet, FileCheck2 } from "lucide-react";
 
 export default function PresetManager({
   presets,
@@ -46,9 +46,13 @@ export default function PresetManager({
                   <div className="preset-meta">
                     <span><FileText size={13} /> {preset.fields.length} fields</span>
                     <span><FileCheck2 size={13} /> Tab: {preset.sheetTabName}</span>
-                    <span>
-                      <FilePlus2 size={13} />{" "}
-                      {preset.docTemplateId ? "Doc linked" : "No doc template"}
+                    <span className={preset.googleSheetUrl ? "meta-ok" : ""}>
+                      <Sheet size={13} />{" "}
+                      {preset.googleSheetUrl ? "Sheet linked" : "No sheet"}
+                    </span>
+                    <span className={preset.googleDocUrl ? "meta-ok" : ""}>
+                      <FileText size={13} />{" "}
+                      {preset.googleDocUrl ? "Doc linked" : "No doc"}
                     </span>
                   </div>
                 </div>

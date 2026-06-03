@@ -6,11 +6,12 @@ import PresetManager from "./components/PresetManager/PresetManager";
 import PresetEditor from "./components/PresetManager/PresetEditor";
 import DynamicForm from "./components/DynamicForm/DynamicForm";
 import QuotationPreview from "./components/QuotationPreview/QuotationPreview";
+import DatabasePage from "./components/Database/DatabasePage";
 import { usePresets } from "./hooks/usePresets";
 
 /**
  * Lightweight view state machine (no router dependency).
- * view.name ∈ dashboard | presets | editor | form | preview
+ * view.name ∈ dashboard | presets | editor | form | preview | database
  */
 export default function App() {
   const { presets, savePreset, deletePreset, getPreset } = usePresets();
@@ -19,13 +20,25 @@ export default function App() {
   const go = (name, extra = {}) => setView({ name, ...extra });
 
   // Top-level sidebar navigation.
-  const handleNav = (key) => go(key === "presets" ? "presets" : "dashboard");
+  const handleNav = (key) => go(key);
 
   const activeNav =
-    view.name === "dashboard" ? "dashboard" : "presets";
+    view.name === "database"
+      ? "database"
+      : view.name === "dashboard"
+      ? "dashboard"
+      : "presets";
 
   const renderScreen = () => {
     switch (view.name) {
+      case "database":
+        return (
+          <DatabasePage
+            presets={presets}
+            onEditPreset={(id) => go("editor", { presetId: id })}
+          />
+        );
+
       case "presets":
         return (
           <PresetManager

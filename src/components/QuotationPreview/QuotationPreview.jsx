@@ -2,7 +2,11 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Save, FileText, CheckCircle2, Loader2 } from "lucide-react";
 import { formatFieldValue } from "../../utils/fieldFormatters";
-import { submitQuotation } from "../../services/quotationService";
+import {
+  submitQuotation,
+  presetSheetId,
+  presetDocId,
+} from "../../services/quotationService";
 
 export default function QuotationPreview({ preset, values, onBack }) {
   const [status, setStatus] = useState({ state: "idle", message: "" });
@@ -80,14 +84,19 @@ export default function QuotationPreview({ preset, values, onBack }) {
           Back & edit
         </button>
         <div className="form-actions">
-          <button className="btn btn-secondary" onClick={() => run(false)} disabled={busy}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => run(false)}
+            disabled={busy}
+            title={presetSheetId(preset) ? "" : "Link a Google Sheet to this preset first"}
+          >
             <Save size={18} /> Save to Sheet
           </button>
           <button
             className="btn btn-primary"
             onClick={() => run(true)}
-            disabled={busy || !preset.docTemplateId}
-            title={preset.docTemplateId ? "" : "Assign a Google Doc template to this preset first"}
+            disabled={busy}
+            title={presetDocId(preset) ? "" : "Link a Google Doc template to this preset first"}
           >
             <FileText size={18} /> Save & Generate Doc
           </button>

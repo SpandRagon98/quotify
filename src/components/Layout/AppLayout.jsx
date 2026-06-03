@@ -1,9 +1,10 @@
-import { LayoutDashboard, Layers, FileText } from "lucide-react";
+import { LayoutDashboard, Layers, Database, FileText } from "lucide-react";
 import { APP } from "../../config/appConfig";
 
 const NAV = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "presets", label: "Presets", icon: Layers },
+  { key: "database", label: "Database", icon: Database },
 ];
 
 export default function AppLayout({ active, onNavigate, children }) {

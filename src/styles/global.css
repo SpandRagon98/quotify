@@ -298,6 +298,105 @@ textarea.control { resize: vertical; }
   font-size: 14px; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm);
 }
 
+/* ---------- Modal ---------- */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(15, 18, 28, 0.45); backdrop-filter: blur(2px);
+  display: grid; place-items: center; padding: 20px;
+}
+.modal {
+  width: 100%; max-width: 480px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); overflow: hidden;
+}
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px; border-bottom: 1px solid var(--border);
+}
+.modal-head h3 { margin: 0; font-size: 17px; font-weight: 700; }
+.modal-body { padding: 20px; }
+.modal-foot {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 16px 20px; border-top: 1px solid var(--border); background: var(--surface-2);
+}
+
+/* ---------- Integration panel ---------- */
+.integration-grid { display: flex; flex-direction: column; gap: 14px; }
+.integration-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 16px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface-2); padding: 16px 18px;
+}
+.integration-info { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.integration-icon {
+  width: 40px; height: 40px; flex-shrink: 0; border-radius: 10px;
+  display: grid; place-items: center; background: var(--brand-soft); color: var(--brand-700);
+}
+.integration-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
+.integration-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.integration-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.linked-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 700; color: var(--success);
+  background: var(--success-soft); padding: 2px 8px; border-radius: 999px;
+}
+.meta-ok { color: var(--success) !important; }
+
+/* ---------- Placeholder panel ---------- */
+.placeholder-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; }
+.placeholder-head h3 { margin: 0; font-size: 16px; font-weight: 700; }
+.placeholder-list { display: flex; flex-wrap: wrap; gap: 10px; }
+.placeholder-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid var(--border-strong); border-radius: 999px;
+  background: var(--surface); padding: 6px 8px 6px 14px;
+}
+.placeholder-chip code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 13px; color: var(--brand-700);
+}
+.chip-copy {
+  display: grid; place-items: center; width: 26px; height: 26px;
+  border: none; border-radius: 50%; background: var(--brand-soft);
+  color: var(--brand-700); cursor: pointer; transition: background 0.15s ease;
+}
+.chip-copy:hover { background: #e3e6ff; }
+
+/* ---------- Database ---------- */
+.db-toolbar { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+.search-box {
+  flex: 1; min-width: 220px; display: flex; align-items: center; gap: 9px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  padding: 0 13px; background: var(--surface); color: var(--text-muted);
+}
+.search-box:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); }
+.search-input { flex: 1; border: none; outline: none; padding: 11px 0; font-size: 14px; background: transparent; color: var(--text); }
+.db-state { display: flex; align-items: center; gap: 10px; color: var(--text-soft); padding: 32px; justify-content: center; }
+.db-count { font-size: 13px; color: var(--text-muted); margin-bottom: 10px; }
+
+.table-wrap {
+  overflow-x: auto; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm);
+}
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table thead th {
+  position: sticky; top: 0; text-align: left; vertical-align: top;
+  background: var(--surface-2); border-bottom: 1px solid var(--border);
+  padding: 10px 14px; white-space: nowrap;
+}
+.th-label { font-weight: 700; color: var(--text-soft); margin-bottom: 6px; }
+.th-filter {
+  width: 100%; min-width: 90px; border: 1px solid var(--border-strong); border-radius: 7px;
+  padding: 5px 8px; font-size: 12px; outline: none; background: var(--surface);
+}
+.th-filter:focus { border-color: var(--brand); }
+.data-table tbody td {
+  padding: 11px 14px; border-bottom: 1px solid var(--border);
+  max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.data-table tbody tr:hover { background: var(--surface-2); }
+.data-table tbody tr:last-child td { border-bottom: none; }
+
 /* ---------- Misc ---------- */
 .spin { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

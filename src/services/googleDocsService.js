@@ -8,12 +8,8 @@
 
 import { GOOGLE } from "../config/appConfig";
 
-/** Extract a Google Doc ID from a full URL, or return the value unchanged. */
-export function extractDocId(idOrUrl) {
-  if (!idOrUrl) return "";
-  const match = String(idOrUrl).match(/[-\w]{25,}/);
-  return match ? match[0] : String(idOrUrl).trim();
-}
+// Re-exported for any legacy import sites; the canonical helper lives in utils.
+export { extractDocId } from "../utils/googleLinks";
 
 /**
  * Generate a document from the preset's template.

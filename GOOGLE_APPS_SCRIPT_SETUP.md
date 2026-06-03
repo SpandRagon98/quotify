@@ -48,12 +48,20 @@ This replaces the old fixed-column logic with **dynamic tabs + dynamic headers**
 ```
 
 The doc template should contain placeholders like `{{Customer Name}}`, `{{Quantity}}`.
+Values come straight from the entered form — **the Doc never reads the Sheet**.
+
+### Read sheet data for the Database tab (`GET ?action=getSheetData`)
+```
+GET <web-app-url>?action=getSheetData&spreadsheetId=<id>&sheetTabName=Standard%20Quotation
+```
+Returns: `{ "success": true, "headers": [...], "rows": [[...], [...]] }`
 
 ---
 
 ## 3. Apps Script code
 
 ```javascript
+// POST handles writes (append rows, generate docs).
 function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
@@ -62,6 +70,17 @@ function doPost(e) {
       case "generateDoc": return json(generateDoc(body));
       default:            return json({ success: false, error: "Unknown action" });
     }
+  } catch (err) {
+    return json({ success: false, error: String(err) });
+  }
+}
+
+// GET handles reads (Database tab fetches the linked sheet).
+function doGet(e) {
+  try {
+    var p = e.parameter || {};
+    if (p.action === "getSheetData") return json(getSheetData(p));
+    return json({ success: false, error: "Unknown action" });
   } catch (err) {
     return json({ success: false, error: String(err) });
   }
@@ -111,6 +130,26 @@ function appendRow(body) {
 }
 
 /**
+ * Read a preset's linked sheet/tab for the Database tab.
+ * Returns the header row + all data rows (as a 2D array).
+ */
+function getSheetData(p) {
+  var ss = p.spreadsheetId
+    ? SpreadsheetApp.openById(p.spreadsheetId)
+    : SpreadsheetApp.getActiveSpreadsheet();
+
+  var sheet = ss.getSheetByName(p.sheetTabName);
+  if (!sheet) return { success: true, headers: [], rows: [] };
+
+  var values = sheet.getDataRange().getValues();
+  if (values.length === 0) return { success: true, headers: [], rows: [] };
+
+  var headers = values[0].map(String);
+  var rows = values.slice(1);
+  return { success: true, headers: headers, rows: rows };
+}
+
+/**
  * Copy a Doc template, replace {{placeholders}}, return the new doc URL.
  */
 function generateDoc(body) {
@@ -139,9 +178,14 @@ function escapeRegex(s) {
 
 ## 4. Notes
 
-- **New Sheet link:** set `GOOGLE.SPREADSHEET_ID` in `appConfig.js`, or bind the
-  script to the new sheet and leave it blank.
-- **New Doc templates:** assign per preset in the UI (Preset → *Google Doc template
-  link / ID*). Each preset can use a different template.
+- **Preset-specific links:** each preset stores its own Google Sheet and Google
+  Doc links (set via *Link Google Sheet* / *Link Google Doc* in the preset editor).
+  The frontend sends the preset's `spreadsheetId` and `templateId` on every call,
+  so one Web App deployment serves all presets.
+- **Re-deploy required:** since `doGet` was added for the Database tab, create a
+  **new deployment version** (Deploy → Manage deployments → Edit → New version),
+  otherwise `getSheetData` returns "Unknown action".
+- **Global fallback:** `GOOGLE.SPREADSHEET_ID` in `appConfig.js` is only used when
+  a preset has no linked sheet; normally you can leave it blank.
 - **Offline testing:** set `GOOGLE.ENABLED = false` in `appConfig.js` to log
   payloads to the console instead of calling the network.

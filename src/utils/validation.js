@@ -3,6 +3,8 @@
  * Each function returns an error string ("" means valid).
  */
 
+import { findDuplicateLabels } from "./googleLinks";
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[+]?[\d\s()-]{7,15}$/;
 const LETTERS_RE = /^[A-Za-z\s.'-]*$/;
@@ -104,5 +106,9 @@ export function validatePreset(preset) {
       errors.push(`"${f.label || `Field ${i + 1}`}" needs at least one dropdown option`);
     }
   });
+  // No two fields may share a label (placeholders must be unique).
+  findDuplicateLabels(preset.fields || []).forEach((label) =>
+    errors.push(`Duplicate field name "${label}" — field names must be unique`)
+  );
   return errors;
 }

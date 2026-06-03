@@ -45,7 +45,7 @@ export default function Dashboard({ presets, onCreatePreset, onOpenForm, onManag
           <FileText size={20} className="stat-icon" />
           <div>
             <div className="stat-value">
-              {presets.filter((p) => p.docTemplateId).length}
+              {presets.filter((p) => p.googleDocUrl).length}
             </div>
             <div className="stat-label">Doc templates linked</div>
           </div>

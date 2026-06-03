@@ -7,13 +7,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { STORAGE_KEYS } from "../config/appConfig";
 import { buildDefaultPresets } from "../data/defaultPresets";
+import { normalizePreset } from "../utils/googleLinks";
 
 function loadPresets() {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.presets);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      // normalizePreset upgrades older shapes so they never crash the UI.
+      if (Array.isArray(parsed)) return parsed.map(normalizePreset);
     }
   } catch (err) {
     console.warn("Could not read presets from storage:", err);

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { ArrowLeft, Save, AlertCircle } from "lucide-react";
 import FieldBuilder from "../FieldBuilder/FieldBuilder";
+import IntegrationPanel from "./IntegrationPanel";
+import PlaceholderPanel from "./PlaceholderPanel";
 import { validatePreset } from "../../utils/validation";
 import { newPresetId } from "../../utils/idGenerator";
 
@@ -10,8 +12,11 @@ function blankPreset() {
     id: newPresetId(),
     name: "",
     description: "",
+    googleSheetUrl: "",
+    googleSheetId: "",
+    googleDocUrl: "",
+    googleDocId: "",
     sheetTabName: "",
-    docTemplateId: "",
     fields: [],
     createdAt: now,
     updatedAt: now,
@@ -99,20 +104,12 @@ export default function PresetEditor({ preset, onSave, onCancel }) {
               onChange={(e) => update({ description: e.target.value })}
             />
           </label>
-
-          <label className="form-field form-field-wide">
-            <span className="form-label">Google Doc template link / ID</span>
-            <input
-              className="control"
-              value={draft.docTemplateId}
-              placeholder="Paste the Google Doc template link or ID (optional)"
-              onChange={(e) => update({ docTemplateId: e.target.value })}
-            />
-            <span className="form-hint">
-              Use placeholders like {"{{Customer Name}}"} in the doc — they map to field labels.
-            </span>
-          </label>
         </div>
+      </div>
+
+      <div className="card">
+        <h3 className="card-title">Google integration</h3>
+        <IntegrationPanel preset={draft} onChange={update} />
       </div>
 
       <div className="card">
@@ -120,6 +117,10 @@ export default function PresetEditor({ preset, onSave, onCancel }) {
           fields={draft.fields}
           onFieldsChange={(fields) => update({ fields })}
         />
+      </div>
+
+      <div className="card">
+        <PlaceholderPanel fields={draft.fields} />
       </div>
     </div>
   );

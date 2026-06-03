@@ -28,7 +28,7 @@ export const APP = {
 export const GOOGLE = {
   // Apps Script Web App endpoint (POST + GET). Update after re-deploying.
   APPS_SCRIPT_URL:
-    "https://script.google.com/macros/s/AKfycbwNgTqLq1fClk326-nQqoqis8_g-iBWLBKCz8sI5j_sRtks2Ki1F-CLyVSx-wqvXVQ0Zg/exec",
+    "https://script.google.com/macros/s/AKfycbzbJRHjJx6JcOiiMgie0O4hCJN4dxYI_AGRgqNHzkqnaIb7nuPyovB2yrYqRfG_SI47/exec",
 
   // Optional: target spreadsheet ID. Leave "" to use the script's bound sheet.
   SPREADSHEET_ID: "",

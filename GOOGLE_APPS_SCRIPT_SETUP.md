@@ -20,12 +20,22 @@ This replaces the old fixed-column logic with **dynamic tabs + dynamic headers**
 ## 1. Create the script
 
 1. Open your target Google Sheet → **Extensions → Apps Script**.
-2. Delete any boilerplate and paste the code below.
-3. **Deploy → New deployment → Web app**
+2. Delete any boilerplate and paste the **entire** code from section 3.
+3. **Authorize it (important — fixes the MailApp permission error):** in the
+   function dropdown at the top pick **`authorize`** → click **Run** → on the
+   "Authorization required" dialog click **Review permissions → choose your
+   account → Allow**. This grants every scope (incl. sending email) at once.
+   - ⚠️ Don't Run `appendRow`/`updateRow`/`deleteRow`/`generateDoc` directly —
+     they need the payload the Web App sends, so running them by hand throws a
+     harmless `Cannot read properties of undefined` error.
+4. **Deploy → New deployment → Web app**
    - Execute as: **Me**
    - Who has access: **Anyone**
-4. Copy the **Web App URL** and paste it into
+5. Copy the **Web App URL** and paste it into
    `src/config/appConfig.js` → `GOOGLE.APPS_SCRIPT_URL`.
+
+> Already deployed? After pasting the updated code, run **`authorize`** once
+> (step 3) and then **Deploy → Manage deployments → Edit → New version → Deploy**.
 
 ---
 
@@ -180,6 +190,27 @@ function json(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * RUN THIS ONCE to authorize the script.
+ * In the editor pick `authorize` from the function dropdown → Run → Review
+ * permissions → Allow. It touches every API the Web App uses (Mail, Drive,
+ * Documents, Spreadsheet, Script) so all required scopes — including
+ * `script.send_mail` for email — are granted in one go. Fixes
+ * "You do not have permission to call MailApp.sendEmail".
+ *
+ * (Do NOT Run appendRow/updateRow/deleteRow/generateDoc directly — they expect
+ *  the payload the Web App sends, so running them by hand throws a harmless
+ *  "Cannot read properties of undefined" error.)
+ */
+function authorize() {
+  MailApp.getRemainingDailyQuota();          // script.send_mail (email)
+  DriveApp.getRootFolder().getName();        // Drive  (doc copy / PDF export)
+  ScriptApp.getService().getUrl();           // Script (web app URL for CTAs)
+  try { SpreadsheetApp.getActiveSpreadsheet(); } catch (e) {} // Spreadsheet
+  try { DocumentApp.getActiveDocument(); } catch (e) {}       // Documents
+  Logger.log("Qyrova Apps Script authorized ✓");
 }
 
 /**

@@ -1,6 +1,6 @@
-# Google Apps Script setup for Quotify
+# Google Apps Script setup for Qyrova
 
-Quotify talks to a single **Google Apps Script Web App** that handles both
+Qyrova talks to a single **Google Apps Script Web App** that handles both
 Google Sheets (dynamic row append) and Google Docs (template → generated doc).
 The frontend sends JSON payloads with an `action` field; the script branches on it.
 
@@ -12,7 +12,7 @@ This replaces the old fixed-column logic with **dynamic tabs + dynamic headers**
 > `sendEmail` actions below. **Replace the entire script with the code in section 3
 > and re-deploy a new version**
 > (Deploy → Manage deployments → Edit → Version: *New version* → Deploy).
-> Each response now echoes its `action`; the Quotify frontend verifies this and
+> Each response now echoes its `action`; the Qyrova frontend verifies this and
 > will no longer show a fake success against an outdated deployment.
 
 ---
@@ -89,13 +89,13 @@ Values come straight from the entered form — **the Doc never reads the Sheet**
 
 ### Send a quotation email (`action: "sendEmail"`)
 The frontend sends the recipient + the placeholder-substituted subject/body.
-The script wraps the body in branded Quotify HTML and appends the
+The script wraps the body in branded Qyrova HTML and appends the
 **Approve / Decline / Negotiate** buttons before sending via Gmail.
 ```json
 {
   "action": "sendEmail",
   "to": "customer@example.com",
-  "subject": "Your quotation from Quotify — QTF-LXY12-AB3C",
+  "subject": "Your quotation from Qyrova — QTF-LXY12-AB3C",
   "body": "Hello,\n\nPlease find your quotation...",
   "quotationId": "QTF-LXY12-AB3C",
   "presetName": "Standard Quotation",
@@ -340,7 +340,7 @@ function escapeRegex(s) {
 }
 
 /**
- * Send a branded Quotify email via Gmail.
+ * Send a branded Qyrova email via Gmail.
  * `body` arrives with placeholders already replaced. We wrap it in branded HTML
  * and append Approve / Decline / Negotiate buttons that reply to the SENDING
  * account (Session user) — so no Gmail address is hardcoded.
@@ -371,7 +371,7 @@ function sendEmail(body) {
   var html =
     '<div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif;color:#14161f;">' +
       '<div style="background:#635bff;padding:18px 24px;border-radius:12px 12px 0 0;">' +
-        '<span style="color:#fff;font-size:20px;font-weight:800;">Quotify</span></div>' +
+        '<span style="color:#fff;font-size:20px;font-weight:800;">Qyrova</span></div>' +
       '<div style="border:1px solid #e7e8ee;border-top:none;border-radius:0 0 12px 12px;padding:24px;">' +
         '<div style="font-size:14px;line-height:1.6;">' + bodyHtml + '</div>' +
         '<div style="margin-top:24px;text-align:center;">' +
@@ -379,10 +379,10 @@ function sendEmail(body) {
           cta("Decline", "Declined", "#e5484d") +
           cta("Negotiate", "Negotiate", "#b7791f") +
         '</div>' +
-        '<p style="margin-top:24px;font-size:12px;color:#8c91a3;">Sent via Quotify</p>' +
+        '<p style="margin-top:24px;font-size:12px;color:#8c91a3;">Sent via Qyrova</p>' +
       '</div></div>';
 
-  GmailApp.sendEmail(body.to, subject, body.body || "", { htmlBody: html, name: "Quotify" });
+  GmailApp.sendEmail(body.to, subject, body.body || "", { htmlBody: html, name: "Qyrova" });
   return { success: true, action: "sendEmail", to: body.to };
 }
 
@@ -442,13 +442,13 @@ function respondPage(p) {
   } catch (err) {
     return HtmlService.createHtmlOutput(
       '<div style="font-family:Arial;max-width:480px;margin:40px auto;text-align:center;">' +
-      '<h2 style="color:#635bff;">Quotify</h2><p>Could not record your response: ' +
+      '<h2 style="color:#635bff;">Qyrova</h2><p>Could not record your response: ' +
       err.message + '</p></div>');
   }
   var color = decision === "Approved" ? "#2b9a66" : decision === "Declined" ? "#e5484d" : "#b7791f";
   return HtmlService.createHtmlOutput(
     '<div style="font-family:Arial;max-width:480px;margin:40px auto;text-align:center;">' +
-      '<div style="background:#635bff;color:#fff;font-weight:800;font-size:22px;padding:16px;border-radius:12px 12px 0 0;">Quotify</div>' +
+      '<div style="background:#635bff;color:#fff;font-weight:800;font-size:22px;padding:16px;border-radius:12px 12px 0 0;">Qyrova</div>' +
       '<div style="border:1px solid #e7e8ee;border-top:none;border-radius:0 0 12px 12px;padding:28px;">' +
         '<div style="display:inline-block;background:' + color + ';color:#fff;padding:8px 18px;border-radius:999px;font-weight:700;">' + decision + '</div>' +
         '<p style="margin-top:18px;color:#565b6e;">Thank you — your response for quotation <b>' +

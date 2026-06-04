@@ -2,7 +2,7 @@
  * Email sending via the Google Apps Script Web App (Gmail).
  *
  * The frontend sends the recipient + the placeholder-substituted subject/body.
- * The Apps Script wraps the body in the branded Quotify HTML template (with the
+ * The Apps Script wraps the body in the branded Qyrova HTML template (with the
  * Approve / Decline / Negotiate CTAs) and sends it from the deploying account —
  * so no Gmail account is hardcoded. See GOOGLE_APPS_SCRIPT_SETUP.md.
  */

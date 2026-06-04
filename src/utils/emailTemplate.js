@@ -38,13 +38,13 @@ export function findRowEmail(preset, headers, row) {
 /** A starter template; the user edits it freely. */
 export function defaultEmailTemplate(preset) {
   return {
-    subject: `Your quotation from Quotify — {{Quotation ID}}`,
+    subject: `Your quotation from Qyrova — {{Quotation ID}}`,
     body:
       `Hello,\n\n` +
       `Thank you for your interest. Please find your ${preset?.name || "quotation"} ` +
       `details below.\n\n` +
       `Quotation ID: {{Quotation ID}}\n\n` +
       `Use the Approve / Decline / Negotiate buttons below to respond.\n\n` +
-      `Best regards,\nThe Quotify Team`,
+      `Best regards,\nThe Qyrova Team`,
   };
 }

@@ -6,12 +6,14 @@ import {
   FileText,
   Mail,
   Users,
+  Settings,
   PanelLeftClose,
   PanelLeft,
   LogOut,
 } from "lucide-react";
 import { APP, STORAGE_KEYS } from "../../config/appConfig";
 import { ROLE_LABELS } from "../../auth/roles";
+import Logo from "../common/Logo";
 
 const NAV = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -20,6 +22,7 @@ const NAV = [
   { key: "docview", label: "Doc View", icon: FileText },
   { key: "email", label: "Email", icon: Mail },
   { key: "users", label: "Users", icon: Users },
+  { key: "settings", label: "Settings", icon: Settings },
 ];
 
 function loadCollapsed() {
@@ -49,7 +52,7 @@ export default function AppLayout({ active, onNavigate, allowedTabs = [], user, 
         <div className="sidebar-top">
           <div className="brand">
             <div className="brand-mark">
-              <FileText size={20} strokeWidth={2.5} />
+              <Logo size={24} />
             </div>
             <div className="brand-text">
               <span className="brand-name">{APP.name}</span>
@@ -83,9 +86,15 @@ export default function AppLayout({ active, onNavigate, allowedTabs = [], user, 
         <div className="sidebar-bottom">
           {user && (
             <div className="sidebar-user" title={user.email}>
-              <div className="sidebar-avatar">{user.email.charAt(0).toUpperCase()}</div>
+              <div className="sidebar-avatar">
+                {user.avatar ? (
+                  <img src={user.avatar} alt="" />
+                ) : (
+                  (user.name || user.email).charAt(0).toUpperCase()
+                )}
+              </div>
               <div className="sidebar-user-info nav-label">
-                <span className="sidebar-user-email">{user.email}</span>
+                <span className="sidebar-user-email">{user.name || user.email}</span>
                 <span className="sidebar-user-role">{ROLE_LABELS[user.role] || user.role}</span>
               </div>
               <button className="collapse-btn" onClick={onLogout} title="Sign out" aria-label="Sign out">

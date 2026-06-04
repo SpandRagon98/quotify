@@ -1,6 +1,6 @@
-# Quotify
+# Qyrova
 
-**Quotify** is a dynamic quotation & form-builder. Instead of fixed input fields,
+**Qyrova** is a dynamic quotation & form-builder. Instead of fixed input fields,
 you design your own **presets** — each with custom fields, its own Google Sheet
 tab, and its own Google Doc template. Fill a preset's form, preview it, then save
 to Google Sheets and/or generate a document from a Doc template.

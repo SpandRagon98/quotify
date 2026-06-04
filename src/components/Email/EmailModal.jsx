@@ -169,7 +169,7 @@ export default function EmailModal({
         <div className="email-preview-pane">
           <span className="form-label">Live preview</span>
           <div className="email-preview-card">
-            <div className="email-preview-brand">Quotify</div>
+            <div className="email-preview-brand">Qyrova</div>
             <div className="email-preview-subject">{previewSubject || "(no subject)"}</div>
             <div className="email-preview-body">{previewBody}</div>
             <div className="email-preview-ctas">
@@ -179,7 +179,7 @@ export default function EmailModal({
             </div>
           </div>
           <p className="form-hint">
-            Quotify branding and the Approve / Decline / Negotiate buttons are added
+            Qyrova branding and the Approve / Decline / Negotiate buttons are added
             automatically. Clicking them updates this record's status.
           </p>
         </div>

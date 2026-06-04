@@ -10,10 +10,12 @@ import DatabasePage from "./components/Database/DatabasePage";
 import DocViewPage from "./components/DocView/DocViewPage";
 import EmailPage from "./components/Email/EmailPage";
 import UsersPage from "./components/Users/UsersPage";
-import LoginScreen from "./components/Auth/LoginScreen";
+import SettingsPage from "./components/Settings/SettingsPage";
+import AuthScreen from "./components/Auth/AuthScreen";
 import NoAccessScreen from "./components/Auth/NoAccessScreen";
 import { usePresets } from "./hooks/usePresets";
 import { useAuth } from "./hooks/useAuth";
+import { useSettings } from "./hooks/useSettings";
 import { allowedTabs, canAccessTab, canDeleteRecords, defaultTab } from "./auth/roles";
 
 /** Maps each view to the sidebar tab that governs access to it. */
@@ -27,10 +29,12 @@ const VIEW_TAB = {
   docview: "docview",
   email: "email",
   users: "users",
+  settings: "settings",
 };
 
 export default function App() {
   const auth = useAuth();
+  const { settings, setMode, setAccent } = useSettings();
   const { presets, savePreset, deletePreset, getPreset } = usePresets();
   const [view, setView] = useState({ name: "dashboard" });
 
@@ -38,7 +42,7 @@ export default function App() {
   const handleNav = (key) => go(key);
 
   // --- Auth gates (all hooks above run unconditionally) ---
-  if (!auth.session) return <LoginScreen onLogin={auth.login} />;
+  if (!auth.session) return <AuthScreen onLogin={auth.login} onSignup={auth.signup} />;
   if (!auth.role) return <NoAccessScreen email={auth.session} onLogout={auth.logout} />;
 
   const role = auth.role;
@@ -94,6 +98,17 @@ export default function App() {
             currentEmail={auth.currentUser.email}
             onUpsert={auth.upsertUser}
             onRemove={auth.removeUser}
+          />
+        );
+
+      case "settings":
+        return (
+          <SettingsPage
+            settings={settings}
+            setMode={setMode}
+            setAccent={setAccent}
+            user={auth.currentUser}
+            onUpdateProfile={auth.updateProfile}
           />
         );
 

@@ -23,12 +23,12 @@ export const ROLE_LABELS = {
 /** Roles that an Owner/Admin can assign to other users (not Owner). */
 export const ASSIGNABLE_ROLES = [ROLES.ADMIN, ROLES.EDITOR, ROLES.DOC_VIEWER];
 
-/** Sidebar tabs each role may see, in display order. */
+/** Sidebar tabs each role may see, in display order. Settings is available to all. */
 const TAB_ACCESS = {
-  owner: ["dashboard", "presets", "database", "docview", "email", "users"],
-  admin: ["dashboard", "presets", "database", "docview", "email", "users"],
-  editor: ["dashboard", "presets", "database", "docview", "email"],
-  doc_viewer: ["docview"],
+  owner: ["dashboard", "presets", "database", "docview", "email", "users", "settings"],
+  admin: ["dashboard", "presets", "database", "docview", "email", "users", "settings"],
+  editor: ["dashboard", "presets", "database", "docview", "email", "settings"],
+  doc_viewer: ["docview", "settings"],
 };
 
 export function allowedTabs(role) {

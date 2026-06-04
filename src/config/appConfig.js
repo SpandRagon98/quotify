@@ -1,5 +1,5 @@
 /**
- * Central configuration for Quotify.
+ * Central configuration for Qyrova.
  *
  * Everything that is environment- or account-specific lives here so it can be
  * updated from a single place. When you receive a new Google Sheet link or new
@@ -7,11 +7,21 @@
  */
 
 export const APP = {
-  name: "Quotify",
+  name: "Qyrova",
   tagline: "Dynamic quotation & form builder",
   description:
     "Design custom quotation presets, collect data through dynamic forms, and sync to Google Sheets & Docs.",
 };
+
+/** Theme accent options exposed in Settings (CSS handles the palettes). */
+export const ACCENTS = [
+  { value: "indigo", label: "Indigo", color: "#635bff" },
+  { value: "violet", label: "Violet", color: "#7c5cff" },
+  { value: "blue", label: "Blue", color: "#2f7df6" },
+  { value: "emerald", label: "Emerald", color: "#0f9d6e" },
+  { value: "rose", label: "Rose", color: "#e8497b" },
+  { value: "amber", label: "Amber", color: "#e0921f" },
+];
 
 /** The app owner always gets Owner access, regardless of the user list. */
 export const OWNER_EMAIL = "spandan305@gmail.com";
@@ -63,4 +73,6 @@ export const STORAGE_KEYS = {
   sidebarCollapsed: "quotify.sidebarCollapsed.v1",
   users: "quotify.users.v1",
   session: "quotify.session.v1",
+  accounts: "quotify.accounts.v1",
+  settings: "quotify.settings.v1",
 };

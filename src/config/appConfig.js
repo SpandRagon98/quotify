@@ -27,6 +27,14 @@ export const ACCENTS = [
 export const OWNER_EMAIL = "spandan305@gmail.com";
 
 /**
+ * Default owner password, seeded/reset once into the local account store so the
+ * owner can always log in. (Demo-only localStorage auth — migrate to a real
+ * backend / Firebase Auth before production.)
+ */
+export const OWNER_DEFAULT_PASSWORD = "spand1234";
+export const OWNER_SEED_VERSION = "1";
+
+/**
  * Google integration config.
  *
  * The app talks to a single Google Apps Script Web App (deployed as
@@ -75,4 +83,5 @@ export const STORAGE_KEYS = {
   session: "quotify.session.v1",
   accounts: "quotify.accounts.v1",
   settings: "quotify.settings.v1",
+  ownerSeed: "quotify.ownerSeed.v1",
 };

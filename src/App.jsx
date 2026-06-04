@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import AppLayout from "./components/Layout/AppLayout";
+import LoadingScreen from "./components/common/LoadingScreen";
 import Dashboard from "./components/Dashboard/Dashboard";
 import PresetManager from "./components/PresetManager/PresetManager";
 import PresetEditor from "./components/PresetManager/PresetEditor";
@@ -37,11 +38,18 @@ export default function App() {
   const { settings, setMode, setAccent } = useSettings();
   const { presets, savePreset, deletePreset, getPreset } = usePresets();
   const [view, setView] = useState({ name: "dashboard" });
+  const [booting, setBooting] = useState(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => setBooting(false), 1600);
+    return () => clearTimeout(t);
+  }, []);
 
   const go = (name, extra = {}) => setView({ name, ...extra });
   const handleNav = (key) => go(key);
 
-  // --- Auth gates (all hooks above run unconditionally) ---
+  // --- Splash, then auth gates (all hooks above run unconditionally) ---
+  if (booting) return <LoadingScreen />;
   if (!auth.session) return <AuthScreen onLogin={auth.login} onSignup={auth.signup} />;
   if (!auth.role) return <NoAccessScreen email={auth.session} onLogout={auth.logout} />;
 

@@ -14,7 +14,12 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { OWNER_EMAIL, STORAGE_KEYS } from "../config/appConfig";
+import {
+  OWNER_EMAIL,
+  OWNER_DEFAULT_PASSWORD,
+  OWNER_SEED_VERSION,
+  STORAGE_KEYS,
+} from "../config/appConfig";
 import { ROLES } from "../auth/roles";
 
 const normalize = (email) => String(email || "").trim().toLowerCase();
@@ -40,6 +45,40 @@ function loadJson(key, fallback) {
   return fallback;
 }
 
+/**
+ * Load accounts and, exactly once per seed version, seed/reset the owner account
+ * so the owner can always log in with the known password. This fixes the
+ * "signup says email exists but login says incorrect password" case for the
+ * owner (a stale/broken hash) while preserving any existing name/avatar.
+ * Non-owner accounts are never touched.
+ */
+function loadAccountsWithOwnerSeed() {
+  const accounts = loadJson(STORAGE_KEYS.accounts, {});
+  let seeded = false;
+  try {
+    seeded = localStorage.getItem(STORAGE_KEYS.ownerSeed) === OWNER_SEED_VERSION;
+  } catch {
+    // ignore
+  }
+  if (!seeded) {
+    const ownerKey = normalize(OWNER_EMAIL);
+    const existing = accounts[ownerKey];
+    accounts[ownerKey] = {
+      email: ownerKey,
+      name: existing?.name || "Owner",
+      passHash: hashPassword(OWNER_DEFAULT_PASSWORD),
+      avatar: existing?.avatar || "",
+    };
+    try {
+      localStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(accounts));
+      localStorage.setItem(STORAGE_KEYS.ownerSeed, OWNER_SEED_VERSION);
+    } catch {
+      // ignore
+    }
+  }
+  return accounts;
+}
+
 function loadSession() {
   try {
     return localStorage.getItem(STORAGE_KEYS.session) || null;
@@ -56,7 +95,7 @@ function resolveRole(email, users) {
 }
 
 export function useAuth() {
-  const [accounts, setAccounts] = useState(() => loadJson(STORAGE_KEYS.accounts, {}));
+  const [accounts, setAccounts] = useState(loadAccountsWithOwnerSeed);
   const [users, setUsers] = useState(() => loadJson(STORAGE_KEYS.users, {}));
   const [session, setSession] = useState(loadSession);
 

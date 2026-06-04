@@ -517,7 +517,15 @@ function sendEmail(body) {
         '<p style="margin-top:24px;font-size:12px;color:#8c91a3;">Sent via Qyrova</p>' +
       '</div></div>';
 
-  GmailApp.sendEmail(body.to, subject, body.body || "", { htmlBody: html, name: "Qyrova" });
+  // Use MailApp (lightweight `script.send_mail` scope) instead of GmailApp, which
+  // needs the heavyweight Gmail scope and otherwise throws a permission error.
+  MailApp.sendEmail({
+    to: body.to,
+    subject: subject,
+    body: body.body || "",   // plain-text fallback
+    htmlBody: html,
+    name: "Qyrova"
+  });
   return { success: true, action: "sendEmail", to: body.to };
 }
 
@@ -616,9 +624,13 @@ function respondPage(p) {
 - **Load & Update (Database tab):** clicking *Load* on a row pulls it back into
   the form; *Update* sends `updateRow`, which finds the row by `Quotation ID` and
   overwrites it — the quotation number stays the same and no duplicate is created.
-- **Email tab (Gmail):** `sendEmail` uses `GmailApp`, which needs the Gmail scope.
-  After pasting the script, run any function once (or re-deploy) and **accept the
-  new Gmail permission** when prompted. Emails are sent from the deploying account.
+- **Email tab:** `sendEmail` uses **`MailApp`** (the lightweight `script.send_mail`
+  scope), NOT `GmailApp` — `GmailApp` requires the heavy Gmail scope and throws
+  *"The script does not have permission to perform that action"* if it isn't
+  authorized. After pasting the updated script you **must re-authorize**: in the
+  editor pick the `doPost` function and click **Run** once (or Deploy → new version),
+  then **Review permissions → Allow** when prompted. Emails are sent from the
+  deploying account; the Approve/Decline/Negotiate CTAs link back to the Web App.
 - **Status buttons:** the Approve / Decline / Negotiate buttons are HTTP links back
   to this Web App (`respond`). Clicking writes the decision into the row's
   **Approval / Decline / Negotiate** column, which then shows as a coloured badge in

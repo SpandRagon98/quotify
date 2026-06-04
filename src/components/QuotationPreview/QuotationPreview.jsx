@@ -13,7 +13,6 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import DocumentPreview from "../common/DocumentPreview";
-import PrintableDocument from "../common/PrintableDocument";
 import Modal from "../common/Modal";
 import { useCompanyProfile } from "../../hooks/useCompanyProfile";
 import {
@@ -232,15 +231,20 @@ export default function QuotationPreview({
         </div>
       </Modal>
 
-      {/* Hidden print document (portal) — only visible when printing */}
+      {/* Hidden print copy of the ACTUAL document preview (portal) — only visible
+          when printing, so the saved PDF matches the on-screen native preview. */}
       {createPortal(
-        <div className="print-area">
-          <PrintableDocument
+        <div className="print-area" aria-hidden="true">
+          <DocumentPreview
             preset={preset}
             values={values}
             quotationId={printId}
+            mode="data"
             logo={logo}
             description={description}
+            onLogoChange={setLogo}
+            onLogoClear={clearLogo}
+            onDescriptionChange={setDescription}
           />
         </div>,
         document.body

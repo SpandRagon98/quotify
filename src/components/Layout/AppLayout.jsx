@@ -56,7 +56,6 @@ export default function AppLayout({ active, onNavigate, allowedTabs = [], user, 
             </div>
             <div className="brand-text">
               <span className="brand-name">{APP.name}</span>
-              <span className="brand-tag">Quotation builder</span>
             </div>
           </div>
           <button

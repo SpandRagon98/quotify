@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Save,
   FileText,
+  FileDown,
   CheckCircle2,
   Loader2,
   RefreshCw,
@@ -11,11 +12,11 @@ import {
   Pencil,
 } from "lucide-react";
 import DocumentPreview from "../common/DocumentPreview";
+import { useCompanyProfile } from "../../hooks/useCompanyProfile";
 import {
   submitQuotation,
   updateQuotation,
   presetSheetId,
-  presetDocId,
 } from "../../services/quotationService";
 
 export default function QuotationPreview({
@@ -28,6 +29,7 @@ export default function QuotationPreview({
 }) {
   const [status, setStatus] = useState({ state: "idle", message: "" });
   const [result, setResult] = useState(null);
+  const { logo, description, setLogo, setDescription, clearLogo } = useCompanyProfile(preset.id);
 
   const isEditMode = Boolean(editingQuotationId);
 
@@ -42,12 +44,14 @@ export default function QuotationPreview({
           : "Saving to Google Sheet…",
       });
 
+      const company = { logo, description };
       const res = isEditMode
         ? await updateQuotation(preset, values, editingQuotationId, {
             generateDoc,
             createdAt: editingCreatedAt,
+            company,
           })
-        : await submitQuotation(preset, values, { generateDoc });
+        : await submitQuotation(preset, values, { generateDoc, company });
 
       setResult(res);
       const docNote = res.docResult?.docUrl ? " Document generated." : "";
@@ -103,6 +107,11 @@ export default function QuotationPreview({
           values={values}
           quotationId={editingQuotationId}
           mode="data"
+          logo={logo}
+          description={description}
+          onLogoChange={setLogo}
+          onLogoClear={clearLogo}
+          onDescriptionChange={setDescription}
         />
       </motion.div>
 
@@ -130,9 +139,16 @@ export default function QuotationPreview({
               {result.docResult.docUrl}
             </a>
           </div>
-          <a className="btn btn-primary" href={result.docResult.docUrl} target="_blank" rel="noreferrer">
-            <FileText size={16} /> Open document
-          </a>
+          <div className="doc-link-actions">
+            <a className="btn btn-secondary" href={result.docResult.docUrl} target="_blank" rel="noreferrer">
+              <FileText size={16} /> Open Google Doc
+            </a>
+            {result.docResult.pdfUrl && (
+              <a className="btn btn-primary" href={result.docResult.pdfUrl} target="_blank" rel="noreferrer">
+                <FileDown size={16} /> Download PDF
+              </a>
+            )}
+          </div>
         </motion.div>
       )}
 
@@ -154,7 +170,7 @@ export default function QuotationPreview({
               className="btn btn-primary"
               onClick={() => run(true)}
               disabled={busy}
-              title={presetDocId(preset) ? "" : "Link a Google Doc template to this preset first"}
+              title="Update and generate the formatted Qyrova document"
             >
               <FileText size={18} /> Update &amp; Generate Doc
             </button>
@@ -173,7 +189,7 @@ export default function QuotationPreview({
               className="btn btn-primary"
               onClick={() => run(true)}
               disabled={busy}
-              title={presetDocId(preset) ? "" : "Link a Google Doc template to this preset first"}
+              title="Save and generate the formatted Qyrova document"
             >
               <FileText size={18} /> Save &amp; Generate Doc
             </button>

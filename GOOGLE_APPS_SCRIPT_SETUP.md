@@ -8,9 +8,9 @@ This replaces the old fixed-column logic with **dynamic tabs + dynamic headers**
 
 > ## ⚠️ If saving "succeeds" but nothing happens, or the Database tab says "Invalid action"
 > Your deployed Web App is an **older script** that doesn't implement the
-> `appendRow`, `updateRow`, `deleteRow`, `generateDoc`, `getSheetData`, and
-> `sendEmail` actions below. **Replace the entire script with the code in section 3
-> and re-deploy a new version**
+> `appendRow`, `updateRow`, `deleteRow`, `generateDoc`, `generateFormattedDoc`,
+> `getSheetData`, and `sendEmail` actions below. **Replace the entire script with
+> the code in section 3 and re-deploy a new version**
 > (Deploy → Manage deployments → Edit → Version: *New version* → Deploy).
 > Each response now echoes its `action`; the Qyrova frontend verifies this and
 > will no longer show a fake success against an outdated deployment.
@@ -73,7 +73,26 @@ Removes the row located by `quotationId` (the app restricts this to Owner/Admin)
 ```
 Errors clearly when `quotationId` is missing or the row isn't found.
 
-### Generate a document (`action: "generateDoc"`)
+### Generate the FORMATTED document (`action: "generateFormattedDoc"`)
+Builds a Qyrova-formatted Google Doc from scratch (logo, company description,
+quotation number, preset name, and a dynamic 2-column field table) — no template
+needed. Returns `docUrl`, `docId`, and a direct `pdfUrl` for download.
+```json
+{
+  "action": "generateFormattedDoc",
+  "presetName": "Standard Quotation",
+  "quotationId": "QTF-LXY12-AB3C",
+  "companyDescription": "Acme Pvt Ltd — premium widgets since 1999.",
+  "companyLogo": "data:image/png;base64,iVBORw0...",
+  "accent": "#635bff",
+  "rows": [
+    { "label": "Customer Name", "value": "Acme" },
+    { "label": "Quantity", "value": "10" }
+  ]
+}
+```
+
+### Generate from a linked template (`action: "generateDoc"`)
 ```json
 {
   "action": "generateDoc",
@@ -132,12 +151,13 @@ function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
     switch (body.action) {
-      case "appendRow":   return json(appendRow(body));
-      case "updateRow":   return json(updateRow(body));
-      case "deleteRow":   return json(deleteRow(body));
-      case "generateDoc": return json(generateDoc(body));
-      case "sendEmail":   return json(sendEmail(body));
-      default:            return json({ success: false, error: "Unknown action: " + body.action });
+      case "appendRow":           return json(appendRow(body));
+      case "updateRow":           return json(updateRow(body));
+      case "deleteRow":           return json(deleteRow(body));
+      case "generateDoc":         return json(generateDoc(body));
+      case "generateFormattedDoc": return json(generateFormattedDoc(body));
+      case "sendEmail":           return json(sendEmail(body));
+      default:                    return json({ success: false, error: "Unknown action: " + body.action });
     }
   } catch (err) {
     return json({ success: false, error: String(err) });
@@ -340,6 +360,109 @@ function escapeRegex(s) {
 }
 
 /**
+ * Build a Qyrova-FORMATTED document programmatically (no template needed),
+ * mirroring the in-app document preview:
+ *   - full-width banner (editable/movable)
+ *   - company logo (uploaded) + "Qyrova" brand title
+ *   - editable company description
+ *   - quotation number + preset name
+ *   - 2-column field table (Field Name | Value), one row per preset field
+ * Returns the doc URL, id, and a direct PDF export URL.
+ *
+ * body = { presetName, quotationId, companyDescription, companyLogo(dataURL),
+ *          accent(#hex), rows:[{label,value}] }
+ */
+function generateFormattedDoc(body) {
+  var accent = body.accent || "#635bff";
+  var doc = DocumentApp.create((body.presetName || "Quotation") + " - " + (body.quotationId || ""));
+  var b = doc.getBody();
+  b.clear();
+  b.setMarginTop(40).setMarginBottom(40).setMarginLeft(48).setMarginRight(48);
+
+  // Full-width banner (1-cell table → spans the content width; edit/move later).
+  var banner = b.appendTable([[" "]]);
+  banner.setBorderWidth(0);
+  var bcell = banner.getCell(0, 0);
+  bcell.setBackgroundColor(accent);
+  bcell.setPaddingTop(10).setPaddingBottom(10).setPaddingLeft(14).setPaddingRight(14);
+  bcell.editAsText().setText("Banner — edit, recolor or replace me").setForegroundColor("#ffffff").setBold(true);
+
+  // Company logo (uploaded data URL) + brand title.
+  if (body.companyLogo) {
+    try { insertDataUrlImage_(b, body.companyLogo, 130); } catch (e) {}
+  }
+  var brand = b.appendParagraph("Qyrova");
+  brand.setHeading(DocumentApp.ParagraphHeading.TITLE);
+  brand.editAsText().setForegroundColor(accent).setBold(true);
+
+  // Editable company description.
+  if (body.companyDescription) {
+    var desc = b.appendParagraph(body.companyDescription);
+    desc.editAsText().setForegroundColor("#565b6e").setItalic(true);
+  }
+
+  // Quotation number + preset name.
+  var qn = b.appendParagraph("Quotation No: " + (body.quotationId || ""));
+  qn.editAsText().setBold(true).setFontSize(13);
+  if (body.presetName) {
+    b.appendParagraph(body.presetName).editAsText().setForegroundColor("#483fd6").setBold(true);
+  }
+
+  // Field table — one row per preset field.
+  var cells = [["Field Name", "Value"]];
+  (body.rows || []).forEach(function (r) {
+    cells.push([String(r.label || ""), String(r.value || "")]);
+  });
+  var table = b.appendTable(cells);
+  styleFieldTable_(table);
+
+  doc.saveAndClose();
+  var id = doc.getId();
+  try {
+    DriveApp.getFileById(id).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (e) {}
+
+  return {
+    success: true,
+    action: "generateFormattedDoc",
+    docUrl: doc.getUrl(),
+    docId: id,
+    pdfUrl: "https://docs.google.com/document/d/" + id + "/export?format=pdf"
+  };
+}
+
+/** Insert a base64 data-URL image, scaled to a max width (points). */
+function insertDataUrlImage_(body, dataUrl, maxWidth) {
+  var m = String(dataUrl).match(/^data:(image\/[^;]+);base64,(.+)$/);
+  if (!m) return null;
+  var blob = Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], "logo");
+  var img = body.appendImage(blob);
+  var w = img.getWidth(), h = img.getHeight();
+  if (w > maxWidth) { img.setWidth(maxWidth); img.setHeight(Math.round(h * maxWidth / w)); }
+  return img;
+}
+
+/** Clean 2-column styling: header row, borders, padding, column widths. */
+function styleFieldTable_(table) {
+  table.setBorderWidth(1);
+  table.setBorderColor("#d7d9e2");
+  try { table.setColumnWidth(0, 170); table.setColumnWidth(1, 300); } catch (e) {}
+  for (var r = 0; r < table.getNumRows(); r++) {
+    var row = table.getRow(r);
+    for (var c = 0; c < row.getNumCells(); c++) {
+      var cell = row.getCell(c);
+      cell.setPaddingTop(7).setPaddingBottom(7).setPaddingLeft(11).setPaddingRight(11);
+      if (r === 0) {
+        cell.setBackgroundColor("#f1f1f6");
+        cell.editAsText().setBold(true).setForegroundColor("#565b6e");
+      } else if (c === 0) {
+        cell.editAsText().setForegroundColor("#565b6e").setBold(true);
+      }
+    }
+  }
+}
+
+/**
  * Send a branded Qyrova email via Gmail.
  * `body` arrives with placeholders already replaced. We wrap it in branded HTML
  * and append Approve / Decline / Negotiate buttons that reply to the SENDING
@@ -471,6 +594,13 @@ function respondPage(p) {
   "Invalid action" / saves that don't appear in the sheet.
 - **Doc template sharing:** the Google Doc template must be accessible to the
   account running the script (the owner) — otherwise `generateDoc` can't copy it.
+- **Formatted doc + PDF:** Clicking *Generate Doc* in the app now uses
+  `generateFormattedDoc`, which builds the document to match the in-app preview
+  and sets it to *Anyone with the link can view* so the returned `pdfUrl`
+  (`…/export?format=pdf`) downloads without sign-in. The app shows **Open Google
+  Doc** and **Download PDF** afterwards. (Needs the Drive + Documents scopes —
+  accept the prompt on re-deploy.) The linked-template flow (`generateDoc`) is kept
+  and still used by Doc View's *Edit in Google Docs*.
 - **Load & Update (Database tab):** clicking *Load* on a row pulls it back into
   the form; *Update* sends `updateRow`, which finds the row by `Quotation ID` and
   overwrites it — the quotation number stays the same and no duplicate is created.

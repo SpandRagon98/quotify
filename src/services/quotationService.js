@@ -26,7 +26,10 @@ import {
   deleteQuotationRow,
   fetchSheetData,
 } from "./googleSheetsService";
-import { generateDocument } from "./googleDocsService";
+import { generateFormattedDocument } from "./googleDocsService";
+
+/** Brand accent used for the generated document (canonical Qyrova indigo). */
+const DOC_ACCENT = "#635bff";
 
 /** Exact user-facing block messages (per spec). */
 export const MSG_NO_SHEET =
@@ -72,38 +75,36 @@ export function buildSheetPayload(preset, values, meta) {
 }
 
 /**
- * Build the Docs payload: { {{Label}}: value } placeholder map.
- * Values come straight from the entered form — the doc does NOT read the Sheet.
+ * Build the payload for the FORMATTED Google Doc generator — mirrors the in-app
+ * document preview (logo, company description, quotation number, preset badge,
+ * and a dynamic 2-column field table built from the entered values).
+ * @param {object} company - { logo?:string(dataURL), description?:string }
  */
-export function buildDocPayload(preset, values, meta) {
+export function buildFormattedDocPayload(preset, values, meta, company = {}) {
   const calcValues = computeCalculatedValues(preset, values);
-  const placeholders = {
-    "Quotation ID": meta.quotationId,
-    "Preset Name": preset.name,
-    "Created At": meta.createdAt,
-  };
-  preset.fields.forEach((f) => {
-    placeholders[f.label] = exportFieldValue(f, values, calcValues);
-  });
+  const rows = preset.fields.map((f) => ({
+    label: f.label,
+    value: exportFieldValue(f, values, calcValues),
+  }));
 
   return {
-    templateId: presetDocId(preset),
     presetName: preset.name,
     quotationId: meta.quotationId,
-    placeholders,
+    companyDescription: company.description || "",
+    companyLogo: company.logo || "",
+    accent: DOC_ACCENT,
+    rows,
   };
 }
 
 /**
- * Save a quotation row, and optionally generate its document.
- * Throws the exact spec messages when a required link is missing.
+ * Save a quotation row, and optionally generate the formatted Qyrova document.
  * @param {object} preset
  * @param {object} values - { [fieldId]: value }
- * @param {object} [opts] - { generateDoc?: boolean }
+ * @param {object} [opts] - { generateDoc?: boolean, company?: {logo,description} }
  */
 export async function submitQuotation(preset, values, opts = {}) {
   if (!presetSheetId(preset)) throw new Error(MSG_NO_SHEET);
-  if (opts.generateDoc && !presetDocId(preset)) throw new Error(MSG_NO_DOC);
 
   const createdAt = new Date().toISOString();
   const meta = {
@@ -116,7 +117,9 @@ export async function submitQuotation(preset, values, opts = {}) {
 
   let docResult = null;
   if (opts.generateDoc) {
-    docResult = await generateDocument(buildDocPayload(preset, values, meta));
+    docResult = await generateFormattedDocument(
+      buildFormattedDocPayload(preset, values, meta, opts.company)
+    );
   }
 
   return { meta, sheetResult, docResult };
@@ -134,7 +137,6 @@ export async function submitQuotation(preset, values, opts = {}) {
 export async function updateQuotation(preset, values, quotationId, opts = {}) {
   if (!presetSheetId(preset)) throw new Error(MSG_NO_SHEET);
   if (!quotationId) throw new Error(MSG_NO_QUOTATION_ID);
-  if (opts.generateDoc && !presetDocId(preset)) throw new Error(MSG_NO_DOC);
 
   const meta = {
     quotationId,
@@ -146,7 +148,9 @@ export async function updateQuotation(preset, values, quotationId, opts = {}) {
 
   let docResult = null;
   if (opts.generateDoc) {
-    docResult = await generateDocument(buildDocPayload(preset, values, meta));
+    docResult = await generateFormattedDocument(
+      buildFormattedDocPayload(preset, values, meta, opts.company)
+    );
   }
 
   return { meta, sheetResult, docResult };

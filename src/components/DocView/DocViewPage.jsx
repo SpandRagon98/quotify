@@ -2,10 +2,12 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { ExternalLink, Link2, Info } from "lucide-react";
 import DocumentPreview from "../common/DocumentPreview";
+import { useCompanyProfile } from "../../hooks/useCompanyProfile";
 
 export default function DocViewPage({ presets, initialPresetId, onEditPreset }) {
   const [presetId, setPresetId] = useState(initialPresetId || presets[0]?.id || "");
   const preset = presets.find((p) => p.id === presetId) || null;
+  const { logo, description, setLogo, setDescription, clearLogo } = useCompanyProfile(presetId);
 
   return (
     <div className="screen screen-wide">
@@ -64,7 +66,15 @@ export default function DocViewPage({ presets, initialPresetId, onEditPreset }) 
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25 }}
           >
-            <DocumentPreview preset={preset} mode="template" />
+            <DocumentPreview
+              preset={preset}
+              mode="template"
+              logo={logo}
+              description={description}
+              onLogoChange={setLogo}
+              onLogoClear={clearLogo}
+              onDescriptionChange={setDescription}
+            />
           </motion.div>
         </>
       )}

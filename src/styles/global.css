@@ -592,6 +592,7 @@ textarea.control { resize: vertical; }
   word-break: break-all; text-decoration: none;
 }
 .doc-link-url:hover { text-decoration: underline; }
+.doc-link-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
 /* ---------- Doc View ---------- */
 .doc-stage { display: flex; flex-direction: column; align-items: center; gap: 12px; }
@@ -837,6 +838,14 @@ textarea.control { resize: vertical; }
   position: absolute; top: -8px; right: -8px; width: 20px; height: 20px; border-radius: 50%;
   border: none; background: var(--danger); color: #fff; display: grid; place-items: center; cursor: pointer;
 }
+.doc-description {
+  width: 100%; border: 1px dashed var(--border-strong); border-radius: 10px;
+  background: transparent; color: var(--text-soft); font-family: inherit;
+  font-size: 13px; line-height: 1.5; padding: 10px 12px; resize: vertical;
+  margin-bottom: 16px; outline: none; transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.doc-description:focus { border-color: var(--brand); border-style: solid; box-shadow: 0 0 0 3px var(--brand-ring); }
+.doc-description::placeholder { color: var(--text-muted); }
 .doc-quote-no {
   font-size: 13px; color: var(--text-muted); margin-bottom: 18px;
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;

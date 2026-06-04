@@ -4,20 +4,29 @@ import Logo from "./Logo";
 import { APP } from "../../config/appConfig";
 import { formatFieldValue } from "../../utils/fieldFormatters";
 import { computeCalculatedValues, formatCalculated } from "../../utils/formula";
-import { useCompanyLogo } from "../../hooks/useCompanyLogo";
 
 /**
- * Document-style preview of a quotation/preset.
+ * Document-style preview of a quotation/preset. Presentational — the company
+ * logo + description are controlled by the parent (so they can also be sent to
+ * the formatted Google Doc generator).
  *
  * - mode "data"     → shows entered values (used in Review).
- * - mode "template" → shows {{Field Name}} placeholders (used in Doc View),
- *   with copy-to-clipboard for building the linked Google Doc template.
+ * - mode "template" → shows {{Field Name}} placeholders (used in Doc View).
  *
- * Theme-aware (glassmorphic, follows light/dark) and fully responsive. The table
- * has exactly one row per preset field; long values wrap and grow the row.
+ * Theme-aware (glassmorphic), responsive. One table row per preset field; long
+ * values wrap and grow the row.
  */
-export default function DocumentPreview({ preset, values, quotationId, mode = "data" }) {
-  const { logo, setLogo, clearLogo } = useCompanyLogo(preset.id);
+export default function DocumentPreview({
+  preset,
+  values,
+  quotationId,
+  mode = "data",
+  logo = "",
+  description = "",
+  onLogoChange,
+  onLogoClear,
+  onDescriptionChange,
+}) {
   const [copied, setCopied] = useState("");
   const fileRef = useRef(null);
 
@@ -38,7 +47,7 @@ export default function DocumentPreview({ preset, values, quotationId, mode = "d
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => setLogo(String(reader.result));
+    reader.onload = () => onLogoChange?.(String(reader.result));
     reader.readAsDataURL(file);
     e.target.value = "";
   };
@@ -65,7 +74,7 @@ export default function DocumentPreview({ preset, values, quotationId, mode = "d
           {logo ? (
             <div className="doc-company-logo">
               <img src={logo} alt="Company logo" />
-              <button className="doc-logo-remove" title="Remove logo" onClick={clearLogo}>
+              <button className="doc-logo-remove" title="Remove logo" onClick={() => onLogoClear?.()}>
                 <X size={14} />
               </button>
             </div>
@@ -76,6 +85,15 @@ export default function DocumentPreview({ preset, values, quotationId, mode = "d
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickLogo} />
         </div>
       </div>
+
+      {/* Editable company description (shown above quotation number) */}
+      <textarea
+        className="doc-description"
+        value={description}
+        rows={2}
+        placeholder="Company description (editable) — appears in the generated document…"
+        onChange={(e) => onDescriptionChange?.(e.target.value)}
+      />
 
       <div className="doc-quote-no">
         Quotation No.{" "}

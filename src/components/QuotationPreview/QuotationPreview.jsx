@@ -1,17 +1,20 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
-  Save,
   FileText,
   FileDown,
+  Printer,
   CheckCircle2,
   Loader2,
-  RefreshCw,
   Database as DatabaseIcon,
   Pencil,
+  AlertTriangle,
 } from "lucide-react";
 import DocumentPreview from "../common/DocumentPreview";
+import PrintableDocument from "../common/PrintableDocument";
+import Modal from "../common/Modal";
 import { useCompanyProfile } from "../../hooks/useCompanyProfile";
 import {
   submitQuotation,
@@ -29,38 +32,59 @@ export default function QuotationPreview({
 }) {
   const [status, setStatus] = useState({ state: "idle", message: "" });
   const [result, setResult] = useState(null);
+  const [docDialog, setDocDialog] = useState(false);
+  const [printId, setPrintId] = useState(editingQuotationId || "");
   const { logo, description, setLogo, setDescription, clearLogo } = useCompanyProfile(preset.id);
 
   const isEditMode = Boolean(editingQuotationId);
 
-  const run = async (generateDoc) => {
+  /** Save the quotation row (no document). */
+  const save = async () => {
+    return isEditMode
+      ? updateQuotation(preset, values, editingQuotationId, {
+          generateDoc: false,
+          createdAt: editingCreatedAt,
+        })
+      : submitQuotation(preset, values, { generateDoc: false });
+  };
+
+  /** Flow 1 — Native preview: save the row, then print/export via the browser. */
+  const generatePreview = async () => {
     try {
-      setStatus({
-        state: "saving",
-        message: isEditMode
-          ? "Updating quotation…"
-          : generateDoc
-          ? "Saving & generating document…"
-          : "Saving to Google Sheet…",
-      });
-
-      const company = { logo, description };
-      const res = isEditMode
-        ? await updateQuotation(preset, values, editingQuotationId, {
-            generateDoc,
-            createdAt: editingCreatedAt,
-            company,
-          })
-        : await submitQuotation(preset, values, { generateDoc, company });
-
+      setStatus({ state: "saving", message: "Saving & preparing preview…" });
+      const res = await save();
       setResult(res);
-      const docNote = res.docResult?.docUrl ? " Document generated." : "";
-      const mockNote = res.sheetResult?.mocked ? " (offline preview — see console)" : "";
+      setPrintId(res.meta.quotationId);
+      const mockNote = res.sheetResult?.mocked ? " (offline — see console)" : "";
       setStatus({
         state: "success",
-        message: isEditMode
-          ? `Updated ${res.meta.quotationId}.${docNote}${mockNote}`
-          : `Saved as ${res.meta.quotationId}.${docNote}${mockNote}`,
+        message: `Saved as ${res.meta.quotationId}. Opening print dialog — choose “Save as PDF”.${mockNote}`,
+        flow: "preview",
+      });
+      // Let the portal re-render with the saved id, then print.
+      requestAnimationFrame(() => setTimeout(() => window.print(), 60));
+    } catch (err) {
+      setStatus({ state: "error", message: err.message });
+    }
+  };
+
+  /** Flow 2 — Google Doc: save the row + generate from the linked template. */
+  const generateGoogleDoc = async () => {
+    setDocDialog(false);
+    try {
+      setStatus({ state: "saving", message: "Saving & generating Google Doc…" });
+      const res = isEditMode
+        ? await updateQuotation(preset, values, editingQuotationId, {
+            generateDoc: true,
+            createdAt: editingCreatedAt,
+          })
+        : await submitQuotation(preset, values, { generateDoc: true });
+      setResult(res);
+      const mockNote = res.sheetResult?.mocked ? " (offline — see console)" : "";
+      setStatus({
+        state: "success",
+        message: `Saved as ${res.meta.quotationId}. Google Doc generated.${mockNote}`,
+        flow: "googledoc",
       });
     } catch (err) {
       setStatus({ state: "error", message: err.message });
@@ -68,7 +92,7 @@ export default function QuotationPreview({
   };
 
   const busy = status.state === "saving";
-  const updated = status.state === "success" && isEditMode;
+  const docReady = status.state === "success" && status.flow === "googledoc" && result?.docResult?.docUrl;
 
   return (
     <div className="screen">
@@ -82,7 +106,7 @@ export default function QuotationPreview({
             <p className="screen-sub">
               {isEditMode
                 ? `Editing quotation ${editingQuotationId} · ${preset.name}`
-                : `Check the details before saving. ${preset.name}`}
+                : `Review the document, then choose how to generate it. ${preset.name}`}
             </p>
           </div>
         </div>
@@ -97,11 +121,7 @@ export default function QuotationPreview({
         </div>
       )}
 
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.25 }}
-      >
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
         <DocumentPreview
           preset={preset}
           values={values}
@@ -127,12 +147,9 @@ export default function QuotationPreview({
         </motion.div>
       )}
 
-      {status.state === "success" && result?.docResult?.docUrl && (
-        <motion.div
-          className="doc-link-card"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+      {/* Google Doc result — Open/Edit + Download PDF (Google Doc flow only) */}
+      {docReady && (
+        <motion.div className="doc-link-card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
           <div>
             <div className="doc-link-label">Generated Google Doc</div>
             <a href={result.docResult.docUrl} target="_blank" rel="noreferrer" className="doc-link-url">
@@ -141,61 +158,93 @@ export default function QuotationPreview({
           </div>
           <div className="doc-link-actions">
             <a className="btn btn-secondary" href={result.docResult.docUrl} target="_blank" rel="noreferrer">
-              <FileText size={16} /> Open Google Doc
+              <FileText size={16} /> Open / Edit Google Doc
             </a>
             {result.docResult.pdfUrl && (
               <a className="btn btn-primary" href={result.docResult.pdfUrl} target="_blank" rel="noreferrer">
-                <FileDown size={16} /> Download PDF
+                <FileDown size={16} /> Download Google Doc as PDF
               </a>
             )}
           </div>
         </motion.div>
       )}
 
+      {/* Actions */}
       <div className="form-actions form-actions-split">
         <button className="btn btn-soft" onClick={onBack} disabled={busy}>
           Back &amp; edit
         </button>
 
-        {updated ? (
+        {status.state === "success" && status.flow === "googledoc" && isEditMode ? (
           <button className="btn btn-primary" onClick={onUpdated}>
             <DatabaseIcon size={18} /> Back to Database
           </button>
-        ) : isEditMode ? (
-          <div className="form-actions">
-            <button className="btn btn-secondary" onClick={() => run(false)} disabled={busy}>
-              <RefreshCw size={18} /> Update Quotation
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={() => run(true)}
-              disabled={busy}
-              title="Update and generate the formatted Qyrova document"
-            >
-              <FileText size={18} /> Update &amp; Generate Doc
-            </button>
-          </div>
         ) : (
-          <div className="form-actions">
+          <div className="gen-options">
             <button
               className="btn btn-secondary"
-              onClick={() => run(false)}
+              onClick={generatePreview}
               disabled={busy}
-              title={presetSheetId(preset) ? "" : "Link a Google Sheet to this preset first"}
+              title={presetSheetId(preset) ? "Save and download the native Qyrova preview as PDF" : "Link a Google Sheet to this preset first"}
             >
-              <Save size={18} /> Save to Sheet
+              <Printer size={18} /> Generate Preview Version
             </button>
             <button
               className="btn btn-primary"
-              onClick={() => run(true)}
+              onClick={() => setDocDialog(true)}
               disabled={busy}
-              title="Save and generate the formatted Qyrova document"
+              title="Generate a Google Doc from the linked template"
             >
-              <FileText size={18} /> Save &amp; Generate Doc
+              <FileText size={18} /> Generate Google Doc Version
             </button>
           </div>
         )}
       </div>
+
+      {/* Google Doc warning dialog */}
+      <Modal
+        open={docDialog}
+        title="Generate Google Doc Version"
+        onClose={() => setDocDialog(false)}
+        footer={
+          <>
+            <button className="btn btn-soft" onClick={() => setDocDialog(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={generateGoogleDoc}>
+              <FileText size={16} /> Continue Generating Google Doc
+            </button>
+          </>
+        }
+      >
+        <div className="doc-warn">
+          <span className="doc-warn-icon"><AlertTriangle size={20} /></span>
+          <div>
+            <p>
+              To generate a Google Doc correctly, you must <strong>manually create the Google
+              Doc template</strong> and place the required placeholders — like{" "}
+              <code>{"{{Customer Name}}"}</code>, <code>{"{{Quotation Number}}"}</code>, etc. —
+              in the correct positions, then link it to this preset.
+            </p>
+            <p className="form-hint">
+              Tip: open <strong>Doc View → Native Version</strong> to copy the exact placeholder
+              names for this preset. Qyrova replaces them with the entered values.
+            </p>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Hidden print document (portal) — only visible when printing */}
+      {createPortal(
+        <div className="print-area">
+          <PrintableDocument
+            preset={preset}
+            values={values}
+            quotationId={printId}
+            logo={logo}
+            description={description}
+          />
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

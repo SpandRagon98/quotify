@@ -43,28 +43,3 @@ export async function generateDocument(payload) {
   }
   return result;
 }
-
-/**
- * Build a Qyrova-FORMATTED document programmatically (no template needed) that
- * mirrors the in-app document preview: logo, company description, quotation
- * number, preset badge, and a 2-column field table. Returns doc + PDF URLs.
- * @param {object} payload - built by quotationService.buildFormattedDocPayload
- * @returns {Promise<{success:boolean, docUrl:string, docId:string, pdfUrl:string, mocked?:boolean}>}
- */
-export async function generateFormattedDocument(payload) {
-  if (!GOOGLE.ENABLED) {
-    console.info("[Docs mock] generateFormattedDocument", payload);
-    return { success: true, mocked: true, docUrl: "", pdfUrl: "" };
-  }
-
-  const result = await postAction("generateFormattedDoc", payload);
-  assertAction(result, "generateFormattedDoc");
-
-  if (!result.docUrl) {
-    throw new Error(
-      "The document was not generated (no link returned). Re-deploy the latest " +
-        "Apps Script — see GOOGLE_APPS_SCRIPT_SETUP.md."
-    );
-  }
-  return result;
-}

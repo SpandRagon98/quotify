@@ -885,6 +885,56 @@ textarea.control { resize: vertical; }
   .doc-col-field { width: 44%; }
 }
 
+/* ---------- Two generate flows + dialog + Doc View toggle ---------- */
+.gen-options { display: flex; gap: 12px; flex-wrap: wrap; }
+.doc-warn { display: flex; gap: 14px; }
+.doc-warn-icon {
+  flex-shrink: 0; width: 40px; height: 40px; border-radius: 11px;
+  display: grid; place-items: center; background: var(--brand-soft); color: var(--brand-700);
+}
+.doc-warn p { margin: 0 0 10px; font-size: 14px; line-height: 1.55; color: var(--text-soft); }
+.doc-warn p:last-child { margin-bottom: 0; }
+.doc-warn code {
+  background: var(--brand-soft); color: var(--brand-700); padding: 1px 6px; border-radius: 6px;
+  font-family: ui-monospace, Menlo, monospace; font-size: 12.5px;
+}
+.doc-toggle {
+  display: inline-flex; gap: 6px; padding: 4px; margin-bottom: 18px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px;
+}
+.doc-toggle-btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;
+  border: none; background: transparent; color: var(--text-soft);
+  font-size: 13px; font-weight: 600; border-radius: 999px; cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.doc-toggle-btn.is-active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+
+/* ---------- Native print document ---------- */
+.print-area { display: none; }
+.print-doc { color: #14161f; font-family: "Plus Jakarta Sans", Arial, sans-serif; max-width: 720px; margin: 0 auto; }
+.print-doc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 16px; }
+.print-brand { display: flex; align-items: center; gap: 10px; color: #635bff; }
+.print-brand-name { font-family: "Outfit", Arial, sans-serif; font-size: 22px; font-weight: 800; color: #14161f; }
+.print-company-logo { max-height: 48px; max-width: 150px; object-fit: contain; }
+.print-desc { color: #565b6e; font-size: 13px; font-style: italic; margin: 0 0 14px; white-space: pre-wrap; }
+.print-quote-no { font-size: 13px; color: #8c91a3; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+.print-quote-no strong { color: #14161f; font-size: 15px; font-family: "Outfit", Arial, sans-serif; }
+.print-preset { margin-left: auto; color: #483fd6; font-weight: 700; font-size: 12px; }
+.print-table { width: 100%; border-collapse: collapse; border: 1px solid #d7d9e2; font-size: 12.5px; }
+.print-table th { text-align: left; background: #f1f1f6; color: #565b6e; padding: 9px 12px; border: 1px solid #d7d9e2; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.print-table td { padding: 9px 12px; border: 1px solid #d7d9e2; vertical-align: top; word-break: break-word; }
+.print-field { font-weight: 700; color: #565b6e; width: 38%; }
+.print-value { color: #14161f; white-space: pre-wrap; }
+
+@media print {
+  @page { margin: 14mm; size: A4; }
+  body { background: #fff !important; }
+  body::before, body::after { display: none !important; }
+  .app, .modal-backdrop, .loading-shell { display: none !important; }
+  .print-area { display: block; position: absolute; inset: 0; }
+}
+
 /* ---------- Loading splash ---------- */
 .loading-shell {
   position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;

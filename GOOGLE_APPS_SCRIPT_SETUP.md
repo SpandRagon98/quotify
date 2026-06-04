@@ -336,7 +336,8 @@ function getSheetData(p) {
 }
 
 /**
- * Copy a Doc template, replace {{placeholders}}, return the new doc URL.
+ * Copy a Doc template, replace {{placeholders}}, share it (link-view) and return
+ * the doc URL + id + a direct PDF export URL (for "Download Google Doc as PDF").
  */
 function generateDoc(body) {
   if (!body.templateId) return { success: false, error: "Missing templateId" };
@@ -352,7 +353,18 @@ function generateDoc(body) {
   });
 
   doc.saveAndClose();
-  return { success: true, action: "generateDoc", docUrl: copy.getUrl(), docId: copy.getId() };
+  var id = copy.getId();
+  try {
+    DriveApp.getFileById(id).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (e) {}
+
+  return {
+    success: true,
+    action: "generateDoc",
+    docUrl: copy.getUrl(),
+    docId: id,
+    pdfUrl: "https://docs.google.com/document/d/" + id + "/export?format=pdf"
+  };
 }
 
 function escapeRegex(s) {

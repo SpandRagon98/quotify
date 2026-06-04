@@ -10,8 +10,7 @@ import {
   Database as DatabaseIcon,
   Pencil,
 } from "lucide-react";
-import { formatFieldValue } from "../../utils/fieldFormatters";
-import { computeCalculatedValues, formatCalculated } from "../../utils/formula";
+import DocumentPreview from "../common/DocumentPreview";
 import {
   submitQuotation,
   updateQuotation,
@@ -30,7 +29,6 @@ export default function QuotationPreview({
   const [status, setStatus] = useState({ state: "idle", message: "" });
   const [result, setResult] = useState(null);
 
-  const calcValues = computeCalculatedValues(preset, values);
   const isEditMode = Boolean(editingQuotationId);
 
   const run = async (generateDoc) => {
@@ -96,23 +94,16 @@ export default function QuotationPreview({
       )}
 
       <motion.div
-        className="card"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25 }}
       >
-        <div className="review-grid">
-          {preset.fields.map((field) => (
-            <div className={`review-item ${field.calculated ? "review-item-calc" : ""}`} key={field.id}>
-              <span className="review-label">{field.label}</span>
-              <span className="review-value">
-                {field.calculated
-                  ? formatCalculated(calcValues[field.id], field)
-                  : formatFieldValue(field, values[field.id])}
-              </span>
-            </div>
-          ))}
-        </div>
+        <DocumentPreview
+          preset={preset}
+          values={values}
+          quotationId={editingQuotationId}
+          mode="data"
+        />
       </motion.div>
 
       {status.state !== "idle" && (

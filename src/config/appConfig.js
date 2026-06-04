@@ -84,4 +84,5 @@ export const STORAGE_KEYS = {
   accounts: "quotify.accounts.v1",
   settings: "quotify.settings.v1",
   ownerSeed: "quotify.ownerSeed.v1",
+  companyLogos: "quotify.companyLogos.v1",
 };

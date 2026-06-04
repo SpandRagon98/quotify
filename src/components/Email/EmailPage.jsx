@@ -130,12 +130,14 @@ export default function EmailPage({ presets, initialPresetId, onEditPreset }) {
                 filters={filters}
                 onFilterChange={handleFilter}
                 statusColumns={STATUS_COLUMNS}
-                rowAction={{
-                  label: "Email",
-                  icon: Mail,
-                  title: "Compose an email for this record",
-                  onClick: (row) => setActiveRow(row),
-                }}
+                rowActions={[
+                  {
+                    label: "Email",
+                    icon: Mail,
+                    title: "Compose an email for this record",
+                    onClick: (row) => setActiveRow(row),
+                  },
+                ]}
               />
             </motion.div>
           )}

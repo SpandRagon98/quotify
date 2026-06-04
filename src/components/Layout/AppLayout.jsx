@@ -5,10 +5,13 @@ import {
   Database,
   FileText,
   Mail,
+  Users,
   PanelLeftClose,
   PanelLeft,
+  LogOut,
 } from "lucide-react";
 import { APP, STORAGE_KEYS } from "../../config/appConfig";
+import { ROLE_LABELS } from "../../auth/roles";
 
 const NAV = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -16,6 +19,7 @@ const NAV = [
   { key: "database", label: "Database", icon: Database },
   { key: "docview", label: "Doc View", icon: FileText },
   { key: "email", label: "Email", icon: Mail },
+  { key: "users", label: "Users", icon: Users },
 ];
 
 function loadCollapsed() {
@@ -26,7 +30,7 @@ function loadCollapsed() {
   }
 }
 
-export default function AppLayout({ active, onNavigate, children }) {
+export default function AppLayout({ active, onNavigate, allowedTabs = [], user, onLogout, children }) {
   const [collapsed, setCollapsed] = useState(loadCollapsed);
 
   useEffect(() => {
@@ -36,6 +40,8 @@ export default function AppLayout({ active, onNavigate, children }) {
       // ignore storage errors
     }
   }, [collapsed]);
+
+  const navItems = NAV.filter((item) => allowedTabs.includes(item.key));
 
   return (
     <div className={`app ${collapsed ? "is-collapsed" : ""}`}>
@@ -61,7 +67,7 @@ export default function AppLayout({ active, onNavigate, children }) {
         </div>
 
         <nav className="nav">
-          {NAV.map(({ key, label, icon: Icon }) => (
+          {navItems.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               className={`nav-item ${active === key ? "is-active" : ""}`}
@@ -74,8 +80,19 @@ export default function AppLayout({ active, onNavigate, children }) {
           ))}
         </nav>
 
-        <div className="sidebar-footer">
-          <span className="dot" /> <span className="nav-label">Connected to Google Workspace</span>
+        <div className="sidebar-bottom">
+          {user && (
+            <div className="sidebar-user" title={user.email}>
+              <div className="sidebar-avatar">{user.email.charAt(0).toUpperCase()}</div>
+              <div className="sidebar-user-info nav-label">
+                <span className="sidebar-user-email">{user.email}</span>
+                <span className="sidebar-user-role">{ROLE_LABELS[user.role] || user.role}</span>
+              </div>
+              <button className="collapse-btn" onClick={onLogout} title="Sign out" aria-label="Sign out">
+                <LogOut size={16} />
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 

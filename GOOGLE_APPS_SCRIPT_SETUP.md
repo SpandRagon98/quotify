@@ -8,8 +8,9 @@ This replaces the old fixed-column logic with **dynamic tabs + dynamic headers**
 
 > ## ⚠️ If saving "succeeds" but nothing happens, or the Database tab says "Invalid action"
 > Your deployed Web App is an **older script** that doesn't implement the
-> `appendRow`, `updateRow`, `generateDoc`, `getSheetData`, and `sendEmail` actions
-> below. **Replace the entire script with the code in section 3 and re-deploy a new version**
+> `appendRow`, `updateRow`, `deleteRow`, `generateDoc`, `getSheetData`, and
+> `sendEmail` actions below. **Replace the entire script with the code in section 3
+> and re-deploy a new version**
 > (Deploy → Manage deployments → Edit → Version: *New version* → Deploy).
 > Each response now echoes its `action`; the Quotify frontend verifies this and
 > will no longer show a fake success against an outdated deployment.
@@ -56,6 +57,18 @@ overwritten in place (no new row). `Quotation ID` and `Created At` are preserved
   "quotationId": "QTF-LXY12-AB3C",
   "headers": ["Quotation ID","Preset Name","Created At","Last Updated At","Customer Name","Quantity"],
   "row": ["QTF-LXY12-AB3C","Standard Quotation","...","...","Acme Updated","12"]
+}
+```
+Errors clearly when `quotationId` is missing or the row isn't found.
+
+### Delete a quotation row (`action: "deleteRow"`)
+Removes the row located by `quotationId` (the app restricts this to Owner/Admin).
+```json
+{
+  "action": "deleteRow",
+  "spreadsheetId": "<sheet id>",
+  "sheetTabName": "Standard Quotation",
+  "quotationId": "QTF-LXY12-AB3C"
 }
 ```
 Errors clearly when `quotationId` is missing or the row isn't found.
@@ -121,6 +134,7 @@ function doPost(e) {
     switch (body.action) {
       case "appendRow":   return json(appendRow(body));
       case "updateRow":   return json(updateRow(body));
+      case "deleteRow":   return json(deleteRow(body));
       case "generateDoc": return json(generateDoc(body));
       case "sendEmail":   return json(sendEmail(body));
       default:            return json({ success: false, error: "Unknown action: " + body.action });
@@ -252,6 +266,33 @@ function updateRow(body) {
     rowNumber: target + 1,
     updatedAt: valueMap["Last Updated At"]
   };
+}
+
+/**
+ * Delete a row, located by Quotation ID (Owner/Admin only — enforced by the app).
+ */
+function deleteRow(body) {
+  if (!body.quotationId) return { success: false, error: "Missing quotationId — cannot delete." };
+
+  var ss = body.spreadsheetId
+    ? SpreadsheetApp.openById(body.spreadsheetId)
+    : SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(body.sheetTabName);
+  if (!sheet) return { success: false, error: "Sheet tab not found: " + body.sheetTabName };
+
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return { success: false, error: "No data rows to delete." };
+
+  var idCol = values[0].map(String).indexOf("Quotation ID");
+  if (idCol === -1) return { success: false, error: "No 'Quotation ID' column found." };
+
+  for (var r = 1; r < values.length; r++) {
+    if (String(values[r][idCol]) === String(body.quotationId)) {
+      sheet.deleteRow(r + 1); // sheet rows are 1-based
+      return { success: true, action: "deleteRow", quotationId: body.quotationId };
+    }
+  }
+  return { success: false, error: "Quotation not found: " + body.quotationId };
 }
 
 /**
@@ -443,6 +484,14 @@ function respondPage(p) {
   quotation later won't erase a recorded status.
 - **Doc View tab:** embeds `https://docs.google.com/document/d/<id>/preview`, so the
   preset's Google Doc must be shared (at least *Anyone with the link can view*).
+- **Delete records:** `deleteRow` removes a row by Quotation ID. The app only shows
+  the Delete action to Owner/Admin; success is reported only after the script confirms.
+- **Login & roles (current = localStorage):** users sign in with their email. The
+  owner email (`spandan305@gmail.com`) is always Owner; others must be added with a
+  role by an Owner/Admin (stored in the browser under `quotify.users.v1`).
+  **Backend migration:** replace `src/hooks/useAuth.js` storage calls with API
+  calls (e.g. a `users` action in this Apps Script backed by a "Users" sheet, or a
+  real auth provider) — the role helpers in `src/auth/roles.js` stay unchanged.
 - **Global fallback:** `GOOGLE.SPREADSHEET_ID` in `appConfig.js` is only used when
   a preset has no linked sheet; normally you can leave it blank.
 - **Offline testing:** set `GOOGLE.ENABLED = false` in `appConfig.js` to log

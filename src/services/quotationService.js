@@ -23,6 +23,7 @@ function exportFieldValue(field, values, calcValues) {
 import {
   appendQuotationRow,
   updateQuotationRow,
+  deleteQuotationRow,
   fetchSheetData,
 } from "./googleSheetsService";
 import { generateDocument } from "./googleDocsService";
@@ -149,6 +150,20 @@ export async function updateQuotation(preset, values, quotationId, opts = {}) {
   }
 
   return { meta, sheetResult, docResult };
+}
+
+/**
+ * Delete a quotation row from a preset's linked sheet (Owner/Admin only — the
+ * caller enforces the role). Located by Quotation ID on the backend.
+ */
+export async function deleteQuotation(preset, quotationId) {
+  if (!presetSheetId(preset)) throw new Error(MSG_NO_SHEET);
+  if (!quotationId) throw new Error(MSG_NO_QUOTATION_ID);
+  return deleteQuotationRow({
+    spreadsheetId: presetSheetId(preset),
+    sheetTabName: preset.sheetTabName,
+    quotationId,
+  });
 }
 
 /**

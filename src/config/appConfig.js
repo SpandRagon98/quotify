@@ -13,6 +13,9 @@ export const APP = {
     "Design custom quotation presets, collect data through dynamic forms, and sync to Google Sheets & Docs.",
 };
 
+/** The app owner always gets Owner access, regardless of the user list. */
+export const OWNER_EMAIL = "spandan305@gmail.com";
+
 /**
  * Google integration config.
  *
@@ -58,4 +61,6 @@ export const STORAGE_KEYS = {
   config: "quotify.config.v1",
   emailTemplates: "quotify.emailTemplates.v1",
   sidebarCollapsed: "quotify.sidebarCollapsed.v1",
+  users: "quotify.users.v1",
+  session: "quotify.session.v1",
 };

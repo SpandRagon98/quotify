@@ -9,17 +9,27 @@ import {
   Loader2,
   Link2,
   SquarePen,
+  Trash2,
 } from "lucide-react";
 import DataTable from "./DataTable";
 import { useSheetData } from "../../hooks/useSheetData";
 import { searchRows, filterRows, toCsv, downloadCsv } from "../../utils/tableData";
 import { rowToFormValues } from "../../utils/rowMapping";
+import { deleteQuotation } from "../../services/quotationService";
+import { METADATA_COLUMNS } from "../../config/appConfig";
 
-export default function DatabasePage({ presets, initialPresetId, onEditPreset, onLoadQuotation }) {
+export default function DatabasePage({
+  presets,
+  initialPresetId,
+  canDelete = false,
+  onEditPreset,
+  onLoadQuotation,
+}) {
   const { presetId, setPresetId, preset, isLinked, data, state, error, reload } =
     useSheetData(presets, initialPresetId);
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState({});
+  const [notice, setNotice] = useState({ state: "idle", message: "" });
 
   // Switching preset also clears the active search/filters.
   const handleSelectPreset = (id) => {
@@ -42,6 +52,43 @@ export default function DatabasePage({ presets, initialPresetId, onEditPreset, o
     const { values, quotationId, createdAt } = rowToFormValues(preset, data.headers, row);
     onLoadQuotation({ presetId: preset.id, values, quotationId, createdAt });
   };
+
+  // Delete a row from the linked Google Sheet (Owner/Admin only).
+  const handleDeleteRow = async (row) => {
+    const idIdx = data.headers.indexOf(METADATA_COLUMNS[0]); // "Quotation ID"
+    const quotationId = idIdx === -1 ? "" : String(row[idIdx] ?? "");
+    if (!quotationId) {
+      setNotice({ state: "error", message: "This row has no Quotation ID — cannot delete." });
+      return;
+    }
+    if (!window.confirm(`Delete quotation ${quotationId}? This removes it from the Google Sheet.`)) {
+      return;
+    }
+    try {
+      setNotice({ state: "working", message: `Deleting ${quotationId}…` });
+      await deleteQuotation(preset, quotationId);
+      setNotice({ state: "success", message: `Deleted ${quotationId}.` });
+      await reload();
+    } catch (err) {
+      setNotice({ state: "error", message: err.message });
+    }
+  };
+
+  const rowActions = [
+    onLoadQuotation && {
+      label: "Load",
+      icon: SquarePen,
+      title: "Load this quotation into the form for editing",
+      onClick: handleLoadRow,
+    },
+    canDelete && {
+      label: "Delete",
+      icon: Trash2,
+      variant: "danger",
+      title: "Delete this quotation from the Google Sheet",
+      onClick: handleDeleteRow,
+    },
+  ].filter(Boolean);
 
   const exportCsv = () => {
     const name = `${preset?.name || "data"}-${new Date().toISOString().slice(0, 10)}.csv`;
@@ -103,6 +150,17 @@ export default function DatabasePage({ presets, initialPresetId, onEditPreset, o
             </button>
           </div>
 
+          {notice.state !== "idle" && (
+            <div
+              className={`alert alert-${
+                notice.state === "error" ? "error" : notice.state === "success" ? "success" : "info"
+              }`}
+            >
+              {notice.state === "working" && <Loader2 size={16} className="spin" />}
+              <span>{notice.message}</span>
+            </div>
+          )}
+
           {state === "loading" && (
             <div className="db-state"><Loader2 size={20} className="spin" /> Loading data…</div>
           )}
@@ -138,16 +196,7 @@ export default function DatabasePage({ presets, initialPresetId, onEditPreset, o
                 rows={visibleRows}
                 filters={filters}
                 onFilterChange={handleFilter}
-                rowAction={
-                  onLoadQuotation
-                    ? {
-                        label: "Load",
-                        icon: SquarePen,
-                        title: "Load this quotation into the form for editing",
-                        onClick: handleLoadRow,
-                      }
-                    : undefined
-                }
+                rowActions={rowActions}
               />
             </motion.div>
           )}

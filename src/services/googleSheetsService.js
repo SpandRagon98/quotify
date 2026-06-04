@@ -60,6 +60,25 @@ export async function updateQuotationRow(payload) {
 }
 
 /**
+ * Delete an existing quotation row (located by Quotation ID on the backend).
+ * @param {{spreadsheetId:string, sheetTabName:string, quotationId:string}} params
+ */
+export async function deleteQuotationRow({ spreadsheetId, sheetTabName, quotationId }) {
+  if (!GOOGLE.ENABLED) {
+    console.info("[Sheets mock] deleteQuotationRow", { spreadsheetId, sheetTabName, quotationId });
+    return { success: true, mocked: true };
+  }
+
+  const result = await postAction("deleteRow", {
+    spreadsheetId: spreadsheetId || GOOGLE.SPREADSHEET_ID || undefined,
+    sheetTabName,
+    quotationId,
+  });
+  assertAction(result, "deleteRow");
+  return result;
+}
+
+/**
  * Read all rows from a preset's linked spreadsheet/tab (Database tab).
  * @param {{spreadsheetId:string, sheetTabName:string}} params
  * @returns {Promise<{headers:string[], rows:Array<Array>, mocked?:boolean}>}

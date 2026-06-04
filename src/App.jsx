@@ -9,41 +9,54 @@ import QuotationPreview from "./components/QuotationPreview/QuotationPreview";
 import DatabasePage from "./components/Database/DatabasePage";
 import DocViewPage from "./components/DocView/DocViewPage";
 import EmailPage from "./components/Email/EmailPage";
+import UsersPage from "./components/Users/UsersPage";
+import LoginScreen from "./components/Auth/LoginScreen";
+import NoAccessScreen from "./components/Auth/NoAccessScreen";
 import { usePresets } from "./hooks/usePresets";
+import { useAuth } from "./hooks/useAuth";
+import { allowedTabs, canAccessTab, canDeleteRecords, defaultTab } from "./auth/roles";
 
-/**
- * Lightweight view state machine (no router dependency).
- * view.name ∈ dashboard | presets | editor | form | preview | database | docview | email
- */
+/** Maps each view to the sidebar tab that governs access to it. */
+const VIEW_TAB = {
+  dashboard: "dashboard",
+  presets: "presets",
+  editor: "presets",
+  form: "presets",
+  preview: "presets",
+  database: "database",
+  docview: "docview",
+  email: "email",
+  users: "users",
+};
+
 export default function App() {
+  const auth = useAuth();
   const { presets, savePreset, deletePreset, getPreset } = usePresets();
   const [view, setView] = useState({ name: "dashboard" });
 
   const go = (name, extra = {}) => setView({ name, ...extra });
-
-  // Top-level sidebar navigation.
   const handleNav = (key) => go(key);
 
-  // Which sidebar item is highlighted for the current view.
-  const NAV_FOR_VIEW = {
-    dashboard: "dashboard",
-    database: "database",
-    docview: "docview",
-    email: "email",
-    presets: "presets",
-    editor: "presets",
-    form: "presets",
-    preview: "presets",
-  };
-  const activeNav = NAV_FOR_VIEW[view.name] || "dashboard";
+  // --- Auth gates (all hooks above run unconditionally) ---
+  if (!auth.session) return <LoginScreen onLogin={auth.login} />;
+  if (!auth.role) return <NoAccessScreen email={auth.session} onLogout={auth.logout} />;
+
+  const role = auth.role;
+  const tabs = allowedTabs(role);
+
+  // Fall back to the role's default tab if the current view isn't permitted.
+  const requiredTab = VIEW_TAB[view.name] || "dashboard";
+  const screenView = canAccessTab(role, requiredTab) ? view : { name: defaultTab(role) };
+  const activeNav = VIEW_TAB[screenView.name] || defaultTab(role);
 
   const renderScreen = () => {
-    switch (view.name) {
+    switch (screenView.name) {
       case "database":
         return (
           <DatabasePage
             presets={presets}
-            initialPresetId={view.presetId}
+            initialPresetId={screenView.presetId}
+            canDelete={canDeleteRecords(role)}
             onEditPreset={(id) => go("editor", { presetId: id })}
             onLoadQuotation={({ presetId, values, quotationId, createdAt }) =>
               go("form", {
@@ -60,7 +73,7 @@ export default function App() {
         return (
           <DocViewPage
             presets={presets}
-            initialPresetId={view.presetId}
+            initialPresetId={screenView.presetId}
             onEditPreset={(id) => go("editor", { presetId: id })}
           />
         );
@@ -69,8 +82,18 @@ export default function App() {
         return (
           <EmailPage
             presets={presets}
-            initialPresetId={view.presetId}
+            initialPresetId={screenView.presetId}
             onEditPreset={(id) => go("editor", { presetId: id })}
+          />
+        );
+
+      case "users":
+        return (
+          <UsersPage
+            userList={auth.userList}
+            currentEmail={auth.currentUser.email}
+            onUpsert={auth.upsertUser}
+            onRemove={auth.removeUser}
           />
         );
 
@@ -88,7 +111,7 @@ export default function App() {
       case "editor":
         return (
           <PresetEditor
-            preset={view.presetId ? getPreset(view.presetId) : null}
+            preset={screenView.presetId ? getPreset(screenView.presetId) : null}
             onSave={(preset) => {
               savePreset(preset);
               go("presets");
@@ -98,46 +121,45 @@ export default function App() {
         );
 
       case "form": {
-        const preset = getPreset(view.presetId);
+        const preset = getPreset(screenView.presetId);
         if (!preset) return fallback(() => go("presets"));
         return (
           <DynamicForm
             preset={preset}
             presets={presets}
-            initialValues={view.initialValues}
-            editingQuotationId={view.editingQuotationId}
+            initialValues={screenView.initialValues}
+            editingQuotationId={screenView.editingQuotationId}
             onSelectPreset={(id) => go("form", { presetId: id })}
             onPreview={(values) =>
               go("preview", {
                 presetId: preset.id,
                 values,
-                editingQuotationId: view.editingQuotationId,
-                editingCreatedAt: view.editingCreatedAt,
+                editingQuotationId: screenView.editingQuotationId,
+                editingCreatedAt: screenView.editingCreatedAt,
               })
             }
             onEdit={(id) => go("editor", { presetId: id })}
-            onBack={() => go(view.editingQuotationId ? "database" : "dashboard")}
+            onBack={() => go(screenView.editingQuotationId ? "database" : "dashboard")}
             onCancelEdit={() => go("form", { presetId: preset.id })}
           />
         );
       }
 
       case "preview": {
-        const preset = getPreset(view.presetId);
+        const preset = getPreset(screenView.presetId);
         if (!preset) return fallback(() => go("presets"));
         return (
           <QuotationPreview
             preset={preset}
-            values={view.values}
-            editingQuotationId={view.editingQuotationId}
-            editingCreatedAt={view.editingCreatedAt}
+            values={screenView.values}
+            editingQuotationId={screenView.editingQuotationId}
+            editingCreatedAt={screenView.editingCreatedAt}
             onBack={() =>
               go("form", {
                 presetId: preset.id,
-                // Preserve entered values + edit context when going back.
-                initialValues: view.values,
-                editingQuotationId: view.editingQuotationId,
-                editingCreatedAt: view.editingCreatedAt,
+                initialValues: screenView.values,
+                editingQuotationId: screenView.editingQuotationId,
+                editingCreatedAt: screenView.editingCreatedAt,
               })
             }
             onUpdated={() => go("database", { presetId: preset.id })}
@@ -159,10 +181,16 @@ export default function App() {
   };
 
   return (
-    <AppLayout active={activeNav} onNavigate={handleNav}>
+    <AppLayout
+      active={activeNav}
+      onNavigate={handleNav}
+      allowedTabs={tabs}
+      user={auth.currentUser}
+      onLogout={auth.logout}
+    >
       <AnimatePresence mode="wait">
         <motion.div
-          key={`${view.name}:${view.presetId || ""}:${view.editingQuotationId || "new"}`}
+          key={`${screenView.name}:${screenView.presetId || ""}:${screenView.editingQuotationId || "new"}`}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}

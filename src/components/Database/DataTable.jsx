@@ -3,19 +3,18 @@ import StatusBadge from "./StatusBadge";
 /**
  * Premium read-only data table with per-column filter inputs.
  *
- * When `rowAction` is provided, an Actions column with a button is shown per row.
- * rowAction = { label, icon: IconComponent, title, onClick(row) }
- * `statusColumns` headers render as coloured status badges.
+ * `rowActions` = array of { label, icon, title, variant?, onClick(row) } rendered
+ * in an Actions column. `statusColumns` headers render as coloured status badges.
  */
 export default function DataTable({
   headers,
   rows,
   filters,
   onFilterChange,
-  rowAction,
+  rowActions = [],
   statusColumns = [],
 }) {
-  const ActionIcon = rowAction?.icon;
+  const hasActions = rowActions.length > 0;
   const isStatus = (h) => statusColumns.includes(h);
 
   return (
@@ -23,7 +22,7 @@ export default function DataTable({
       <table className="data-table">
         <thead>
           <tr>
-            {rowAction && (
+            {hasActions && (
               <th className="th-action">
                 <div className="th-label">Actions</div>
               </th>
@@ -44,15 +43,23 @@ export default function DataTable({
         <tbody>
           {rows.map((row, ri) => (
             <tr key={ri}>
-              {rowAction && (
+              {hasActions && (
                 <td className="td-action">
-                  <button
-                    className="btn btn-soft btn-xs"
-                    onClick={() => rowAction.onClick(row)}
-                    title={rowAction.title || rowAction.label}
-                  >
-                    {ActionIcon && <ActionIcon size={14} />} {rowAction.label}
-                  </button>
+                  <div className="row-actions">
+                    {rowActions.map((action, ai) => {
+                      const Icon = action.icon;
+                      return (
+                        <button
+                          key={ai}
+                          className={`btn btn-xs ${action.variant === "danger" ? "btn-danger-soft" : "btn-soft"}`}
+                          onClick={() => action.onClick(row)}
+                          title={action.title || action.label}
+                        >
+                          {Icon && <Icon size={14} />} {action.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </td>
               )}
               {headers.map((h, ci) =>

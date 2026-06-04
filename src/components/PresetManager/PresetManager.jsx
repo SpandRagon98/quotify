@@ -1,5 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Pencil, Trash2, FileText, Sheet, FileCheck2 } from "lucide-react";
+import { Plus, Pencil, Trash2, FileText, Sheet, FileCheck2, ExternalLink } from "lucide-react";
+
+const openInNewTab = (url) => url && window.open(url, "_blank", "noopener");
 
 export default function PresetManager({
   presets,
@@ -58,6 +60,22 @@ export default function PresetManager({
                 </div>
 
                 <div className="preset-row-actions">
+                  <button
+                    className="btn btn-ghost btn-xs"
+                    disabled={!preset.googleSheetUrl}
+                    title={preset.googleSheetUrl ? "Open linked Google Sheet" : "No Sheet linked"}
+                    onClick={() => openInNewTab(preset.googleSheetUrl)}
+                  >
+                    <ExternalLink size={14} /> Sheet
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-xs"
+                    disabled={!preset.googleDocUrl}
+                    title={preset.googleDocUrl ? "Open linked Google Doc" : "No Doc linked"}
+                    onClick={() => openInNewTab(preset.googleDocUrl)}
+                  >
+                    <ExternalLink size={14} /> Doc
+                  </button>
                   <button className="btn btn-soft" onClick={() => onOpenForm(preset.id)}>
                     Use
                   </button>

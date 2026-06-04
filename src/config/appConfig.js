@@ -18,9 +18,15 @@ export const ACCENTS = [
   { value: "indigo", label: "Indigo", color: "#635bff" },
   { value: "violet", label: "Violet", color: "#7c5cff" },
   { value: "blue", label: "Blue", color: "#2f7df6" },
+  { value: "cyan", label: "Cyan", color: "#0bb3d6" },
   { value: "emerald", label: "Emerald", color: "#0f9d6e" },
   { value: "rose", label: "Rose", color: "#e8497b" },
   { value: "amber", label: "Amber", color: "#e0921f" },
+  { value: "slate", label: "Slate", color: "#475569" },
+  { value: "bluegray", label: "Blue Gray", color: "#546079" },
+  { value: "graphite", label: "Graphite", color: "#545861" },
+  { value: "charcoal", label: "Charcoal", color: "#44474f" },
+  { value: "neutral", label: "Neutral Gray", color: "#6b7280" },
 ];
 
 /** The app owner always gets Owner access, regardless of the user list. */

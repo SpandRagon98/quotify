@@ -10,6 +10,8 @@ import {
   PanelLeftClose,
   PanelLeft,
   LogOut,
+  Menu,
+  X,
 } from "lucide-react";
 import { APP, STORAGE_KEYS } from "../../config/appConfig";
 import { ROLE_LABELS } from "../../auth/roles";
@@ -35,6 +37,7 @@ function loadCollapsed() {
 
 export default function AppLayout({ active, onNavigate, allowedTabs = [], user, onLogout, children }) {
   const [collapsed, setCollapsed] = useState(loadCollapsed);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -46,8 +49,31 @@ export default function AppLayout({ active, onNavigate, allowedTabs = [], user, 
 
   const navItems = NAV.filter((item) => allowedTabs.includes(item.key));
 
+  // Navigating on mobile also closes the drawer.
+  const handleNav = (key) => {
+    onNavigate(key);
+    setMobileOpen(false);
+  };
+
   return (
-    <div className={`app ${collapsed ? "is-collapsed" : ""}`}>
+    <div className={`app ${collapsed ? "is-collapsed" : ""} ${mobileOpen ? "mobile-open" : ""}`}>
+      {/* Mobile top bar (hidden on desktop) */}
+      <header className="mobile-topbar">
+        <button className="mobile-menu-btn" onClick={() => setMobileOpen(true)} aria-label="Open menu">
+          <Menu size={20} />
+        </button>
+        <div className="mobile-brand">
+          <span className="mobile-brand-mark"><Logo size={20} /></span>
+          <span className="mobile-brand-name">{APP.name}</span>
+        </div>
+        <button className="mobile-menu-btn" onClick={onLogout} aria-label="Sign out" title="Sign out">
+          <LogOut size={18} />
+        </button>
+      </header>
+
+      {/* Drawer overlay (mobile only) */}
+      <div className="drawer-overlay" onClick={() => setMobileOpen(false)} aria-hidden="true" />
+
       <aside className="sidebar">
         <div className="sidebar-top">
           <div className="brand">
@@ -59,12 +85,19 @@ export default function AppLayout({ active, onNavigate, allowedTabs = [], user, 
             </div>
           </div>
           <button
-            className="collapse-btn"
+            className="collapse-btn desktop-only"
             onClick={() => setCollapsed((c) => !c)}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
+          </button>
+          <button
+            className="collapse-btn mobile-close"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Close menu"
+          >
+            <X size={18} />
           </button>
         </div>
 
@@ -73,7 +106,7 @@ export default function AppLayout({ active, onNavigate, allowedTabs = [], user, 
             <button
               key={key}
               className={`nav-item ${active === key ? "is-active" : ""}`}
-              onClick={() => onNavigate(key)}
+              onClick={() => handleNav(key)}
               title={label}
             >
               <Icon size={18} />

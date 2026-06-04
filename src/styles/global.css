@@ -1,10 +1,10 @@
 /*
- * FONT — Qyrova uses a premium geometric pairing (Google Fonts):
- *   - Plus Jakarta Sans : body / UI / tables / forms / buttons
- *   - Outfit            : display headings + brand
+ * FONT — Qyrova uses a premium pairing (Google Fonts):
+ *   - Manrope : body / UI / tables / forms / buttons (clean, premium at small sizes)
+ *   - Outfit  : display headings + brand
  * Loaded over the network; no local font files required.
  */
-@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap");
 
 /* ===================== Design tokens ===================== */
 :root {
@@ -28,10 +28,11 @@
   --glass-blur: 22px;
   --glass-highlight: rgba(255, 255, 255, 0.5);
 
-  /* Animated background aura */
-  --aura-1: rgba(99, 91, 255, 0.18);
-  --aura-2: rgba(56, 189, 248, 0.14);
-  --aura-3: rgba(168, 85, 247, 0.14);
+  /* Animated background aura — thin, subtle multi-hue tints */
+  --aura-1: rgba(99, 91, 255, 0.13);
+  --aura-2: rgba(56, 189, 248, 0.10);
+  --aura-3: rgba(168, 85, 247, 0.10);
+  --aura-4: rgba(45, 212, 160, 0.08);
 
   /* Sidebar (themed) */
   --sidebar-bg: rgba(255, 255, 255, 0.55);
@@ -63,13 +64,14 @@
   --fs-body: 13.5px;
   --fs-control: 13px;
 
-  --font-body: "Plus Jakarta Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  --font-display: "Outfit", "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-body: "Manrope", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  --font-display: "Outfit", "Manrope", system-ui, sans-serif;
 
   font-family: var(--font-body);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   letter-spacing: -0.01em;
 }
 
@@ -99,9 +101,10 @@
   --glass-border: rgba(255, 255, 255, 0.09);
   --glass-highlight: rgba(255, 255, 255, 0.06);
 
-  --aura-1: rgba(124, 116, 255, 0.22);
-  --aura-2: rgba(56, 189, 248, 0.16);
-  --aura-3: rgba(168, 85, 247, 0.18);
+  --aura-1: rgba(124, 116, 255, 0.18);
+  --aura-2: rgba(56, 189, 248, 0.12);
+  --aura-3: rgba(168, 85, 247, 0.14);
+  --aura-4: rgba(45, 212, 160, 0.10);
 
   --sidebar-bg: rgba(18, 20, 28, 0.6);
   --sidebar-text: #aeb3c4;
@@ -126,39 +129,49 @@ body {
   background: var(--bg);
   color: var(--text);
   font-size: var(--fs-body);
+  line-height: 1.5;
+  letter-spacing: -0.006em;
 }
 
 /* Slowly drifting gradient wash */
 body::before {
   content: ""; position: fixed; inset: -12%; z-index: 0; pointer-events: none;
   background-image: var(--app-gradient);
-  background-size: 160% 160%;
-  animation: bgShift 38s ease-in-out infinite alternate;
+  background-size: 170% 170%;
+  animation: bgShift 46s ease-in-out infinite alternate;
 }
-/* Subtle animated aura field */
+/* Subtle animated aura field — drifts AND slowly shifts colour (very subtle). */
 body::after {
   content: ""; position: fixed; inset: -20%; z-index: 0; pointer-events: none;
   background:
-    radial-gradient(38% 38% at 18% 28%, var(--aura-1), transparent 70%),
-    radial-gradient(34% 34% at 82% 18%, var(--aura-2), transparent 70%),
-    radial-gradient(44% 44% at 62% 88%, var(--aura-3), transparent 72%);
-  filter: blur(60px);
-  animation: auraDrift 26s ease-in-out infinite alternate;
+    radial-gradient(38% 38% at 18% 26%, var(--aura-1), transparent 70%),
+    radial-gradient(32% 32% at 84% 18%, var(--aura-2), transparent 70%),
+    radial-gradient(42% 42% at 64% 86%, var(--aura-3), transparent 72%),
+    radial-gradient(30% 30% at 30% 78%, var(--aura-4), transparent 72%);
+  animation: auraDrift 32s ease-in-out infinite alternate, auraHue 90s linear infinite;
+  will-change: transform, filter;
 }
 #root { position: relative; z-index: 1; }
 
 @keyframes bgShift {
   0%   { background-position: 0% 0%; transform: translate3d(0, 0, 0); }
-  50%  { background-position: 100% 50%; transform: translate3d(1.5%, -1.5%, 0); }
-  100% { background-position: 50% 100%; transform: translate3d(-1.5%, 1.5%, 0); }
+  50%  { background-position: 100% 50%; transform: translate3d(1.2%, -1.2%, 0); }
+  100% { background-position: 50% 100%; transform: translate3d(-1.2%, 1.2%, 0); }
 }
 @keyframes auraDrift {
   0%   { transform: translate3d(0, 0, 0) scale(1); }
-  50%  { transform: translate3d(2.5%, -2%, 0) scale(1.08); }
-  100% { transform: translate3d(-2.5%, 2.5%, 0) scale(1.05); }
+  50%  { transform: translate3d(2%, -1.6%, 0) scale(1.07); }
+  100% { transform: translate3d(-2%, 2%, 0) scale(1.04); }
+}
+/* Gentle colour cycle — keep blur inside the keyframe so it persists. */
+@keyframes auraHue {
+  0%   { filter: blur(64px) hue-rotate(0deg) saturate(1); }
+  50%  { filter: blur(64px) hue-rotate(18deg) saturate(1.12); }
+  100% { filter: blur(64px) hue-rotate(0deg) saturate(1); }
 }
 @media (prefers-reduced-motion: reduce) {
   body::before, body::after { animation: none; }
+  body::after { filter: blur(64px); }
 }
 
 button { font-family: inherit; }
@@ -244,10 +257,10 @@ button { font-family: inherit; }
 .screen-wide { max-width: 1680px; }
 .screen-head {
   display: flex; justify-content: space-between; align-items: flex-start;
-  gap: 20px; margin-bottom: 28px; flex-wrap: wrap;
+  gap: 20px; margin-bottom: 24px; flex-wrap: wrap;
 }
-.screen-title { margin: 0; font-size: 27px; font-weight: 700; letter-spacing: -0.02em; }
-.screen-sub { margin: 6px 0 0; color: var(--text-soft); font-size: 14px; }
+.screen-title { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.15; }
+.screen-sub { margin: 5px 0 0; color: var(--text-soft); font-size: 13.5px; line-height: 1.5; }
 .head-with-back { display: flex; align-items: flex-start; gap: 14px; }
 .head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
@@ -255,13 +268,13 @@ button { font-family: inherit; }
   display: flex; justify-content: space-between; align-items: center;
   margin: 8px 0 16px;
 }
-.section-head h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.section-head h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
 
 /* ---------- Buttons ---------- */
 .btn {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 10px 16px; border-radius: var(--radius-sm);
-  font-size: 14px; font-weight: 600; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 15px; border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 600; cursor: pointer; letter-spacing: 0.005em;
   border: 1px solid transparent; transition: all 0.18s ease;
   white-space: nowrap;
 }
@@ -300,10 +313,10 @@ button { font-family: inherit; }
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm), inset 0 1px 0 var(--glass-highlight);
-  padding: 22px;
-  margin-bottom: 18px;
+  padding: 22px 24px;
+  margin-bottom: 16px;
 }
-.card-title { margin: 0 0 18px; font-size: 15px; font-weight: 700; }
+.card-title { margin: 0 0 16px; font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em; }
 
 /* ---------- Stats ---------- */
 .stat-row {
@@ -363,13 +376,16 @@ button { font-family: inherit; }
 
 /* ---------- Forms ---------- */
 .form-grid {
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 18px;
 }
-.form-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.form-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .form-field-wide { grid-column: 1 / -1; }
-.form-label { font-size: 13px; font-weight: 600; color: var(--text-soft); }
+.form-label {
+  font-size: 12px; font-weight: 600; color: var(--text-soft);
+  letter-spacing: 0.01em; display: inline-flex; align-items: center; gap: 6px;
+}
 .req { color: var(--danger); margin-left: 3px; }
-.form-hint { font-size: 12px; color: var(--text-muted); }
+.form-hint { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
 .form-error { font-size: 12px; color: var(--danger); font-weight: 500; }
 
 .control {
@@ -432,15 +448,16 @@ textarea.control { resize: vertical; }
 
 /* ---------- Alerts ---------- */
 .alert {
-  display: flex; align-items: center; gap: 10px;
-  padding: 13px 16px; border-radius: var(--radius-sm);
-  font-size: 14px; margin-bottom: 18px; border: 1px solid transparent;
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 15px; border-radius: var(--radius-sm);
+  font-size: 13px; line-height: 1.55; margin-bottom: 16px; border: 1px solid transparent;
 }
+.alert > svg { flex-shrink: 0; margin-top: 1px; }
 .alert ul { margin: 0; padding-left: 18px; }
-.alert-error { background: var(--danger-soft); color: #b42318; border-color: #f4c7c7; }
-.alert-success { background: var(--success-soft); color: #1a7a4c; border-color: #b7e3cb; }
-.alert-info { background: var(--info-soft); color: var(--brand-700); border-color: #d7daff; }
-.alert-link { margin-left: auto; color: inherit; font-weight: 700; text-decoration: underline; }
+.alert-error { background: var(--danger-soft); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 24%, transparent); }
+.alert-success { background: var(--success-soft); color: var(--success); border-color: color-mix(in srgb, var(--success) 24%, transparent); }
+.alert-info { background: var(--info-soft); color: var(--brand); border-color: color-mix(in srgb, var(--brand) 22%, transparent); }
+.alert-link { margin-left: auto; color: inherit; font-weight: 600; text-decoration: underline; }
 
 /* ---------- Empty states ---------- */
 .empty-state {

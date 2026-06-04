@@ -49,7 +49,7 @@ export const OWNER_SEED_VERSION = "1";
 export const GOOGLE = {
   // Apps Script Web App endpoint (POST + GET). Update after re-deploying.
   APPS_SCRIPT_URL:
-    "https://script.google.com/macros/s/AKfycbygc0Onk8YL-F_o9GOuqvRvRoDryUlsZm29mPqaW3n01GYxOaLCjutX5YgXqD_XbPf4lA/exec",
+    "https://script.google.com/macros/s/AKfycbygAN5CzwuipirX5T0C5h2S1-pQDMW9g9timt2lSgOADxTVkcKxU6Kcx3Zz1CkGyoNjHQ/exec",
 
   // Optional: target spreadsheet ID. Leave "" to use the script's bound sheet.
   SPREADSHEET_ID: "",

@@ -503,12 +503,26 @@ function sendEmail(body) {
       label + '</a>';
   }
 
+  // Optional company logo (right side of the header) as an inline image (cid),
+  // which renders reliably across mail clients (data: URIs are often blocked).
+  var inlineImages = {};
+  var logoCell = "";
+  if (body.companyLogo) {
+    var lm = String(body.companyLogo).match(/^data:(image\/[^;]+);base64,(.+)$/);
+    if (lm) {
+      inlineImages.companyLogo = Utilities.newBlob(Utilities.base64Decode(lm[2]), lm[1], "logo");
+      logoCell = '<img src="cid:companyLogo" style="max-height:34px;max-width:130px;">';
+    }
+  }
+
   var html =
-    '<div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif;color:#14161f;">' +
-      '<div style="background:#635bff;padding:18px 24px;border-radius:12px 12px 0 0;">' +
-        '<span style="color:#fff;font-size:20px;font-weight:800;">Qyrova</span></div>' +
+    '<div style="max-width:600px;margin:0 auto;font-family:Arial,Helvetica,sans-serif;color:#14161f;">' +
+      '<table width="100%" cellpadding="0" cellspacing="0" style="background:#635bff;border-radius:12px 12px 0 0;"><tr>' +
+        '<td style="padding:16px 24px;color:#fff;font-size:19px;font-weight:700;letter-spacing:0.2px;">Qyrova</td>' +
+        '<td style="padding:12px 24px;text-align:right;">' + logoCell + '</td>' +
+      '</tr></table>' +
       '<div style="border:1px solid #e7e8ee;border-top:none;border-radius:0 0 12px 12px;padding:24px;">' +
-        '<div style="font-size:14px;line-height:1.6;">' + bodyHtml + '</div>' +
+        '<div style="font-size:14px;line-height:1.65;color:#3a3f4d;">' + bodyHtml + '</div>' +
         '<div style="margin-top:24px;text-align:center;">' +
           cta("Approve", "Approved", "#2b9a66") +
           cta("Decline", "Declined", "#e5484d") +
@@ -517,16 +531,41 @@ function sendEmail(body) {
         '<p style="margin-top:24px;font-size:12px;color:#8c91a3;">Sent via Qyrova</p>' +
       '</div></div>';
 
-  // Use MailApp (lightweight `script.send_mail` scope) instead of GmailApp, which
-  // needs the heavyweight Gmail scope and otherwise throws a permission error.
+  // Build attachments: native PDF (base64) and/or a Google Doc exported as PDF.
+  var attachments = [];
+  if (body.attachmentPdfBase64) {
+    attachments.push(Utilities.newBlob(
+      Utilities.base64Decode(body.attachmentPdfBase64),
+      "application/pdf",
+      body.attachmentName || ("Quotation-" + quoteId + ".pdf")
+    ));
+  }
+  if (body.attachTemplate && body.attachTemplate.templateId) {
+    var at = body.attachTemplate;
+    var copy = DriveApp.getFileById(at.templateId).makeCopy("temp-" + quoteId);
+    var tdoc = DocumentApp.openById(copy.getId());
+    var tbody = tdoc.getBody();
+    Object.keys(at.placeholders || {}).forEach(function (k) {
+      tbody.replaceText("\\{\\{" + escapeRegex(k) + "\\}\\}", String(at.placeholders[k]));
+    });
+    tdoc.saveAndClose();
+    var pdf = DriveApp.getFileById(copy.getId()).getAs("application/pdf");
+    pdf.setName(at.name || ("Quotation-" + quoteId + ".pdf"));
+    attachments.push(pdf);
+    DriveApp.getFileById(copy.getId()).setTrashed(true);
+  }
+
+  // MailApp (lightweight `script.send_mail` scope) — avoids GmailApp's heavy scope.
   MailApp.sendEmail({
     to: body.to,
     subject: subject,
-    body: body.body || "",   // plain-text fallback
+    body: body.body || "",
     htmlBody: html,
-    name: "Qyrova"
+    name: "Qyrova",
+    inlineImages: inlineImages,
+    attachments: attachments
   });
-  return { success: true, action: "sendEmail", to: body.to };
+  return { success: true, action: "sendEmail", to: body.to, attached: attachments.length };
 }
 
 /**
@@ -631,6 +670,12 @@ function respondPage(p) {
   editor pick the `doPost` function and click **Run** once (or Deploy → new version),
   then **Review permissions → Allow** when prompted. Emails are sent from the
   deploying account; the Approve/Decline/Negotiate CTAs link back to the Web App.
+- **Email attachments:** the app can attach the quotation PDF — either a **native**
+  PDF captured in-browser (sent as base64) or a **Google Doc** PDF (the script copies
+  the linked template, fills placeholders, exports it as PDF and trashes the temp doc).
+  The Google Doc attachment path uses Drive/Documents, so accept those scopes on
+  re-auth too. The uploaded company logo is embedded as an inline image (`cid`) in
+  the email header.
 - **Status buttons:** the Approve / Decline / Negotiate buttons are HTTP links back
   to this Web App (`respond`). Clicking writes the decision into the row's
   **Approval / Decline / Negotiate** column, which then shows as a coloured badge in

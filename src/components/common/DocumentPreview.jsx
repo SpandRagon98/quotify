@@ -71,6 +71,9 @@ export default function DocumentPreview({
         </div>
 
         <div className="doc-logo-slot">
+          <button className="btn btn-soft btn-xs doc-upload-btn" onClick={() => fileRef.current?.click()}>
+            <Upload size={14} /> {logo ? "Change logo" : "Upload Logo"}
+          </button>
           {logo ? (
             <div className="doc-company-logo">
               <img src={logo} alt="Company logo" />
@@ -79,9 +82,6 @@ export default function DocumentPreview({
               </button>
             </div>
           ) : null}
-          <button className="btn btn-soft btn-xs" onClick={() => fileRef.current?.click()}>
-            <Upload size={14} /> {logo ? "Change logo" : "Upload Logo"}
-          </button>
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickLogo} />
         </div>
       </div>

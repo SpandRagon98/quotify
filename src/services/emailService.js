@@ -41,13 +41,17 @@ export async function sendQuotationEmail({
   presetName,
   spreadsheetId,
   sheetTabName,
+  companyLogo,
+  attachmentPdfBase64,
+  attachmentName,
+  attachTemplate,
 }) {
   if (!to) {
     throw new Error("No email address found in this row — add/fill an email field.");
   }
 
   if (!GOOGLE.ENABLED) {
-    console.info("[Email mock] sendQuotationEmail", { to, subject, body });
+    console.info("[Email mock] sendQuotationEmail", { to, subject, attach: attachmentName || attachTemplate });
     return { success: true, mocked: true };
   }
 
@@ -60,6 +64,10 @@ export async function sendQuotationEmail({
       presetName: presetName || "",
       spreadsheetId: spreadsheetId || "",
       sheetTabName: sheetTabName || "",
+      companyLogo: companyLogo || "",
+      attachmentPdfBase64: attachmentPdfBase64 || "",
+      attachmentName: attachmentName || "",
+      attachTemplate: attachTemplate || null,
     });
     assertAction(result, "sendEmail");
     return result;

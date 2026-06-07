@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchPresetData, presetSheetId } from "../services/quotationService";
 import { METADATA_COLUMNS } from "../config/appConfig";
+import { useNotifications } from "../notifications/useNotifications";
 
 const EMPTY = { total: 0, approved: 0, declined: 0, negotiated: 0, pending: 0, latest: null };
 
@@ -14,6 +15,7 @@ export function useDashboardData(presets) {
   const [state, setState] = useState("idle"); // idle | loading | loaded | empty | error
   const [error, setError] = useState("");
   const [stats, setStats] = useState(EMPTY);
+  const { ingest } = useNotifications();
 
   const load = useCallback(async () => {
     const linked = presets.filter((p) => presetSheetId(p));
@@ -41,6 +43,7 @@ export function useDashboardData(presets) {
       }
       anyOk = true;
       const { preset, headers, rows } = r.value;
+      ingest(preset.name, headers, rows);
       const idx = (name) => headers.indexOf(name);
       const ai = idx("Approval");
       const di = idx("Decline");
@@ -77,7 +80,7 @@ export function useDashboardData(presets) {
       setError(firstError); // partial-failure note (some presets loaded)
       setState(agg.total > 0 ? "loaded" : "empty");
     }
-  }, [presets]);
+  }, [presets, ingest]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

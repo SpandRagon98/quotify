@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Database as DatabaseIcon,
@@ -10,11 +10,15 @@ import {
   Link2,
   SquarePen,
   Trash2,
+  FileText,
 } from "lucide-react";
 import DataTable from "./DataTable";
+import DocumentPreview from "../common/DocumentPreview";
 import { useSheetData } from "../../hooks/useSheetData";
+import { useCompanyProfile } from "../../hooks/useCompanyProfile";
 import { searchRows, filterRows, toCsv, downloadCsv } from "../../utils/tableData";
 import { rowToFormValues } from "../../utils/rowMapping";
+import { elementToPdfBlobUrl } from "../../utils/pdf";
 import { deleteQuotation } from "../../services/quotationService";
 import { METADATA_COLUMNS } from "../../config/appConfig";
 
@@ -27,9 +31,14 @@ export default function DatabasePage({
 }) {
   const { presetId, setPresetId, preset, isLinked, data, state, error, reload } =
     useSheetData(presets, initialPresetId);
+  const cfg = useCompanyProfile(presetId);
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState({});
   const [notice, setNotice] = useState({ state: "idle", message: "" });
+  const [viewRow, setViewRow] = useState(null);
+  const pdfStageRef = useRef(null);
+
+  const viewDoc = viewRow && preset ? rowToFormValues(preset, data.headers, viewRow) : null;
 
   // Switching preset also clears the active search/filters.
   const handleSelectPreset = (id) => {
@@ -74,6 +83,32 @@ export default function DatabasePage({
     }
   };
 
+  // View Quote — generate the native PDF for this row on demand and open it.
+  const handleViewQuote = async (row) => {
+    if (!preset) return;
+    setViewRow(row);
+    setNotice({ state: "working", message: "Preparing the quotation document…" });
+    // Wait for the hidden stage to render the selected row, then capture.
+    requestAnimationFrame(() => {
+      setTimeout(async () => {
+        try {
+          if (!pdfStageRef.current) throw new Error("Could not prepare the document.");
+          const url = await elementToPdfBlobUrl(pdfStageRef.current);
+          const win = window.open(url, "_blank");
+          if (!win) {
+            setNotice({ state: "info", message: "Pop-up blocked — allow pop-ups to view the document." });
+          } else {
+            setNotice({ state: "idle", message: "" });
+          }
+        } catch (err) {
+          setNotice({ state: "error", message: err.message });
+        } finally {
+          setViewRow(null);
+        }
+      }, 80);
+    });
+  };
+
   const rowActions = [
     onLoadQuotation && {
       label: "Load",
@@ -87,6 +122,12 @@ export default function DatabasePage({
       variant: "danger",
       title: "Delete this quotation from the Google Sheet",
       onClick: handleDeleteRow,
+    },
+    {
+      label: "View",
+      icon: FileText,
+      title: "View the generated quotation document (PDF)",
+      onClick: handleViewQuote,
     },
   ].filter(Boolean);
 
@@ -201,6 +242,23 @@ export default function DatabasePage({
             </motion.div>
           )}
         </>
+      )}
+
+      {/* Off-screen A4 stage used to render the selected row's native PDF. */}
+      {viewDoc && (
+        <div className="pdf-stage" ref={pdfStageRef} aria-hidden="true">
+          <DocumentPreview
+            preset={preset}
+            values={viewDoc.values}
+            quotationId={viewDoc.quotationId}
+            mode="data"
+            logo={cfg.logo}
+            banner={cfg.banner}
+            description={cfg.description}
+            hiddenFields={cfg.hiddenFields}
+            extraContent={cfg.extraContent}
+          />
+        </div>
       )}
     </div>
   );

@@ -16,6 +16,7 @@ import {
 import { APP, STORAGE_KEYS } from "../../config/appConfig";
 import { ROLE_LABELS } from "../../auth/roles";
 import Logo from "../common/Logo";
+import NotificationBell from "../Notifications/NotificationBell";
 
 const NAV = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -66,9 +67,12 @@ export default function AppLayout({ active, onNavigate, allowedTabs = [], user, 
           <span className="mobile-brand-mark"><Logo size={20} /></span>
           <span className="mobile-brand-name">{APP.name}</span>
         </div>
-        <button className="mobile-menu-btn" onClick={onLogout} aria-label="Sign out" title="Sign out">
-          <LogOut size={18} />
-        </button>
+        <div className="mobile-topbar-actions">
+          <NotificationBell compact />
+          <button className="mobile-menu-btn" onClick={onLogout} aria-label="Sign out" title="Sign out">
+            <LogOut size={18} />
+          </button>
+        </div>
       </header>
 
       {/* Drawer overlay (mobile only) */}
@@ -137,7 +141,12 @@ export default function AppLayout({ active, onNavigate, allowedTabs = [], user, 
         </div>
       </aside>
 
-      <main className="content">{children}</main>
+      <main className="content">
+        <div className="content-topbar desktop-only">
+          <NotificationBell />
+        </div>
+        {children}
+      </main>
     </div>
   );
 }

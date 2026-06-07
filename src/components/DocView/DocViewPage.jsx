@@ -9,7 +9,7 @@ export default function DocViewPage({ presets, initialPresetId, onEditPreset }) 
   const [presetId, setPresetId] = useState(initialPresetId || presets[0]?.id || "");
   const [docMode, setDocMode] = useState("native"); // native | googledoc
   const preset = presets.find((p) => p.id === presetId) || null;
-  const { logo, description, setLogo, setDescription, clearLogo } = useCompanyProfile(presetId);
+  const cfg = useCompanyProfile(presetId);
 
   const docId = preset ? presetDocId(preset) : "";
   const previewUrl = docId ? `https://docs.google.com/document/d/${docId}/preview` : "";
@@ -73,8 +73,8 @@ export default function DocViewPage({ presets, initialPresetId, onEditPreset }) 
           <div className="alert alert-info">
             <Info size={18} />
             <span>
-              Native Qyrova document. Copy any <code>{"{{placeholder}}"}</code> below to build a
-              Google Doc template for the Google Doc Version.
+              Native Qyrova document. Hide fields, add a banner or extra content, and copy any{" "}
+              <code>{"{{placeholder}}"}</code> to build a Google Doc template.
             </span>
           </div>
           <motion.div
@@ -87,11 +87,22 @@ export default function DocViewPage({ presets, initialPresetId, onEditPreset }) 
             <DocumentPreview
               preset={preset}
               mode="template"
-              logo={logo}
-              description={description}
-              onLogoChange={setLogo}
-              onLogoClear={clearLogo}
-              onDescriptionChange={setDescription}
+              editMeta
+              editFields
+              logo={cfg.logo}
+              banner={cfg.banner}
+              description={cfg.description}
+              hiddenFields={cfg.hiddenFields}
+              extraContent={cfg.extraContent}
+              onLogoChange={cfg.setLogo}
+              onLogoClear={cfg.clearLogo}
+              onBannerChange={cfg.setBanner}
+              onBannerClear={cfg.clearBanner}
+              onDescriptionChange={cfg.setDescription}
+              onToggleField={cfg.toggleField}
+              onAddExtra={cfg.addExtra}
+              onUpdateExtra={cfg.updateExtra}
+              onRemoveExtra={cfg.removeExtra}
             />
           </motion.div>
         </>

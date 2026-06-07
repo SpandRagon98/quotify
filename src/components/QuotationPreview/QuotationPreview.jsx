@@ -37,7 +37,7 @@ export default function QuotationPreview({
   const [docDialog, setDocDialog] = useState(false);
   const [docMode, setDocMode] = useState("native"); // native | googledoc
   const [printId, setPrintId] = useState(editingQuotationId || "");
-  const { logo, description, setLogo, setDescription, clearLogo } = useCompanyProfile(preset.id);
+  const cfg = useCompanyProfile(preset.id);
 
   const isEditMode = Boolean(editingQuotationId);
   const docId = presetDocId(preset);
@@ -134,11 +134,17 @@ export default function QuotationPreview({
             values={values}
             quotationId={editingQuotationId}
             mode="data"
-            logo={logo}
-            description={description}
-            onLogoChange={setLogo}
-            onLogoClear={clearLogo}
-            onDescriptionChange={setDescription}
+            editMeta
+            logo={cfg.logo}
+            banner={cfg.banner}
+            description={cfg.description}
+            hiddenFields={cfg.hiddenFields}
+            extraContent={cfg.extraContent}
+            onLogoChange={cfg.setLogo}
+            onLogoClear={cfg.clearLogo}
+            onBannerChange={cfg.setBanner}
+            onBannerClear={cfg.clearBanner}
+            onDescriptionChange={cfg.setDescription}
           />
         </motion.div>
       ) : preset.googleDocUrl ? (
@@ -254,11 +260,11 @@ export default function QuotationPreview({
             values={values}
             quotationId={printId}
             mode="data"
-            logo={logo}
-            description={description}
-            onLogoChange={setLogo}
-            onLogoClear={clearLogo}
-            onDescriptionChange={setDescription}
+            logo={cfg.logo}
+            banner={cfg.banner}
+            description={cfg.description}
+            hiddenFields={cfg.hiddenFields}
+            extraContent={cfg.extraContent}
           />
         </div>,
         document.body

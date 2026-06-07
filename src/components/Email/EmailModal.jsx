@@ -44,7 +44,8 @@ export default function EmailModal({
   const lastFocused = useRef("body");
   const pdfStageRef = useRef(null);
 
-  const { logo, description } = useCompanyProfile(preset.id);
+  const cfg = useCompanyProfile(preset.id);
+  const logo = cfg.logo;
   const recipient = row ? findRowEmail(preset, headers, row) : "";
   const hasTemplate = Boolean(presetDocId(preset));
   const busy = status.state === "sending";
@@ -257,8 +258,11 @@ export default function EmailModal({
           values={rowDoc.values}
           quotationId={quotationId || rowDoc.quotationId}
           mode="data"
-          logo={logo}
-          description={description}
+          logo={cfg.logo}
+          banner={cfg.banner}
+          description={cfg.description}
+          hiddenFields={cfg.hiddenFields}
+          extraContent={cfg.extraContent}
         />
       </div>
     </Modal>

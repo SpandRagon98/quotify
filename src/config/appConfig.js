@@ -91,4 +91,6 @@ export const STORAGE_KEYS = {
   settings: "quotify.settings.v1",
   ownerSeed: "quotify.ownerSeed.v1",
   companyLogos: "quotify.companyLogos.v1",
+  notifications: "quotify.notifications.v1",
+  notifSeen: "quotify.notifSeen.v1",
 };

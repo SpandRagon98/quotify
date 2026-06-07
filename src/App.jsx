@@ -14,6 +14,7 @@ import UsersPage from "./components/Users/UsersPage";
 import SettingsPage from "./components/Settings/SettingsPage";
 import AuthScreen from "./components/Auth/AuthScreen";
 import NoAccessScreen from "./components/Auth/NoAccessScreen";
+import NotificationsProvider from "./notifications/NotificationsProvider";
 import { usePresets } from "./hooks/usePresets";
 import { useAuth } from "./hooks/useAuth";
 import { useSettings } from "./hooks/useSettings";
@@ -204,25 +205,27 @@ export default function App() {
   };
 
   return (
-    <AppLayout
-      active={activeNav}
-      onNavigate={handleNav}
-      allowedTabs={tabs}
-      user={auth.currentUser}
-      onLogout={auth.logout}
-    >
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`${screenView.name}:${screenView.presetId || ""}:${screenView.editingQuotationId || "new"}`}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.22 }}
-        >
-          {renderScreen()}
-        </motion.div>
-      </AnimatePresence>
-    </AppLayout>
+    <NotificationsProvider>
+      <AppLayout
+        active={activeNav}
+        onNavigate={handleNav}
+        allowedTabs={tabs}
+        user={auth.currentUser}
+        onLogout={auth.logout}
+      >
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={`${screenView.name}:${screenView.presetId || ""}:${screenView.editingQuotationId || "new"}`}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22 }}
+          >
+            {renderScreen()}
+          </motion.div>
+        </AnimatePresence>
+      </AppLayout>
+    </NotificationsProvider>
   );
 }
 

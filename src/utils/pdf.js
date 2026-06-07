@@ -49,3 +49,9 @@ export async function elementToPdfBase64(el) {
   const uri = pdf.output("datauristring");
   return uri.substring(uri.indexOf("base64,") + 7);
 }
+
+/** Generate a PDF from `el` and return an object URL (for opening in a new tab). */
+export async function elementToPdfBlobUrl(el) {
+  const pdf = canvasToPdf(await renderCanvas(el));
+  return URL.createObjectURL(pdf.output("blob"));
+}

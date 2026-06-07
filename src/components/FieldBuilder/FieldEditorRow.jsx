@@ -1,7 +1,30 @@
-import { motion } from "framer-motion";
-import { ChevronUp, ChevronDown, Trash2, GripVertical, Calculator, Plus } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronUp, ChevronDown, Trash2, GripVertical, Calculator, Plus, ListTree } from "lucide-react";
 import { FIELD_TYPES, TEXT_MODES, fieldTypeHasOptions } from "../../utils/fieldFormatters";
 import { validateFormula } from "../../utils/formula";
+import { getSubfields } from "../../utils/subfields";
+import { newFieldId } from "../../utils/idGenerator";
+import SubfieldEditor from "./SubfieldEditor";
+
+function blankSubfield() {
+  return {
+    id: newFieldId(),
+    label: "",
+    type: "text",
+    required: false,
+    defaultValue: "",
+    placeholder: "",
+    options: [],
+    textMode: "any",
+    calculated: false,
+    formula: "",
+    format: "number",
+    decimals: "",
+    prefix: "",
+    suffix: "",
+    gateFieldId: "",
+  };
+}
 
 const FORMATS = [
   { value: "number", label: "Number" },
@@ -36,6 +59,32 @@ export default function FieldEditorRow({
 
   const insertIntoFormula = (label) =>
     update({ formula: `${field.formula || ""}${field.formula ? " " : ""}${label}` });
+
+  // --- Subfields ---
+  const subfields = getSubfields(field);
+  const setSubfields = (next) => update({ subfields: next });
+  const addSubfield = () => setSubfields([...subfields, blankSubfield()]);
+  const updateSubfield = (updated) =>
+    setSubfields(subfields.map((s) => (s.id === updated.id ? updated : s)));
+  const removeSubfield = (id) => setSubfields(subfields.filter((s) => s.id !== id));
+  const moveSubfield = (from, to) => {
+    if (to < 0 || to >= subfields.length) return;
+    const next = [...subfields];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setSubfields(next);
+  };
+
+  // Number/boolean/calculated leaves (parent fields + their subfields) usable in
+  // a subfield formula, excluding the subfield itself.
+  const allLeaves = allFields.flatMap((f) => [f, ...getSubfields(f)]);
+  const subUsableFields = (subId) =>
+    allLeaves.filter(
+      (f) =>
+        f.id !== subId &&
+        f.label.trim() &&
+        (f.type === "number" || f.type === "boolean" || f.calculated)
+    );
 
   return (
     <motion.div
@@ -235,6 +284,43 @@ export default function FieldEditorRow({
             <input type="checkbox" checked={field.required} onChange={(e) => update({ required: e.target.checked })} />
             <span>Required field</span>
           </label>
+        )}
+      </div>
+
+      {/* Subfields — indented manual/calculated entries under this field. */}
+      <div className="subfield-section">
+        <div className="subfield-section-head">
+          <span className="subfield-section-title">
+            <ListTree size={14} /> Subfields
+            {subfields.length > 0 && <span className="subfield-count">{subfields.length}</span>}
+          </span>
+          <button className="btn btn-ghost btn-xs" onClick={addSubfield} type="button">
+            <Plus size={14} /> Add subfield
+          </button>
+        </div>
+        {subfields.length === 0 ? (
+          <p className="subfield-hint">
+            Optional. Add detail lines (e.g. Table Cost, Bed Cost) shown under{" "}
+            <strong>{field.label || "this field"}</strong> in the form and as bullets in the document.
+          </p>
+        ) : (
+          <div className="subfield-list">
+            <AnimatePresence initial={false}>
+              {subfields.map((sub, si) => (
+                <SubfieldEditor
+                  key={sub.id}
+                  subfield={sub}
+                  parentLabel={field.label}
+                  index={si}
+                  total={subfields.length}
+                  usableFields={subUsableFields(sub.id)}
+                  onChange={updateSubfield}
+                  onRemove={removeSubfield}
+                  onMove={moveSubfield}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
         )}
       </div>
     </motion.div>

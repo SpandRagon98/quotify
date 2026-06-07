@@ -3,6 +3,8 @@
  * placeholder generation, and preset normalisation (backward compatibility).
  */
 
+import { flattenFields } from "./subfields";
+
 const ID_RE = /[-\w]{25,}/;
 
 /** True if the string looks like a Google Sheets URL. */
@@ -32,23 +34,32 @@ export const extractSheetId = extractId;
 export const extractDocId = extractId;
 
 /**
- * Build placeholder tokens from a preset's fields.
- * @returns {{id:string, label:string, token:string}[]}
+ * Build placeholder tokens from a preset's fields, including subfields
+ * ("Parent - Sub").
+ * @returns {{id:string, label:string, token:string, isSub:boolean}[]}
  */
 export function fieldsToPlaceholders(fields = []) {
-  return fields
-    .filter((f) => f.label && f.label.trim())
-    .map((f) => ({ id: f.id, label: f.label, token: `{{${f.label}}}` }));
+  return flattenFields(fields)
+    .filter((l) => l.field.label && l.field.label.trim())
+    .map((l) => ({
+      id: l.valueId,
+      label: l.columnLabel,
+      token: `{{${l.columnLabel}}}`,
+      isSub: l.isSub,
+    }));
 }
 
-/** Detect duplicate (case-insensitive) field labels in a preset. */
+/**
+ * Detect duplicate (case-insensitive) column labels across parent fields AND
+ * subfields — placeholder tokens / sheet columns must be unique.
+ */
 export function findDuplicateLabels(fields = []) {
   const seen = new Map();
   const dupes = new Set();
-  fields.forEach((f) => {
-    const key = (f.label || "").trim().toLowerCase();
-    if (!key) return;
-    if (seen.has(key)) dupes.add(f.label.trim());
+  flattenFields(fields).forEach((l) => {
+    const key = (l.columnLabel || "").trim().toLowerCase();
+    if (!key || !l.field.label || !l.field.label.trim()) return;
+    if (seen.has(key)) dupes.add(l.columnLabel.trim());
     seen.set(key, true);
   });
   return [...dupes];

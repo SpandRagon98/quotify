@@ -48,7 +48,7 @@ export default function PlaceholderPanel({ fields }) {
             {placeholders.map((p) => (
               <motion.div
                 key={p.id}
-                className="placeholder-chip"
+                className={`placeholder-chip ${p.isSub ? "placeholder-chip-sub" : ""}`}
                 layout
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Database as DatabaseIcon,
@@ -52,18 +52,25 @@ export default function DatabasePage({
     return searchRows(byFilter, query);
   }, [data, filters, query]);
 
-  const handleFilter = (header, value) =>
-    setFilters((prev) => ({ ...prev, [header]: value }));
+  // Stable so the (potentially large) DataTable doesn't re-render when unrelated
+  // state (notice banners, etc.) changes.
+  const handleFilter = useCallback(
+    (header, value) => setFilters((prev) => ({ ...prev, [header]: value })),
+    []
+  );
 
   // Load a saved row back into its preset's form for editing.
-  const handleLoadRow = (row) => {
-    if (!preset || !onLoadQuotation) return;
-    const { values, quotationId, createdAt } = rowToFormValues(preset, data.headers, row);
-    onLoadQuotation({ presetId: preset.id, values, quotationId, createdAt });
-  };
+  const handleLoadRow = useCallback(
+    (row) => {
+      if (!preset || !onLoadQuotation) return;
+      const { values, quotationId, createdAt } = rowToFormValues(preset, data.headers, row);
+      onLoadQuotation({ presetId: preset.id, values, quotationId, createdAt });
+    },
+    [preset, onLoadQuotation, data.headers]
+  );
 
   // Delete a row from the linked Google Sheet (Owner/Admin only).
-  const handleDeleteRow = async (row) => {
+  const handleDeleteRow = useCallback(async (row) => {
     const idIdx = data.headers.indexOf(METADATA_COLUMNS[0]); // "Quotation ID"
     const quotationId = idIdx === -1 ? "" : String(row[idIdx] ?? "");
     if (!quotationId) {
@@ -81,10 +88,10 @@ export default function DatabasePage({
     } catch (err) {
       setNotice({ state: "error", message: err.message });
     }
-  };
+  }, [preset, data.headers, reload]);
 
   // View Quote — generate the native PDF for this row on demand and open it.
-  const handleViewQuote = async (row) => {
+  const handleViewQuote = useCallback(async (row) => {
     if (!preset) return;
     setViewRow(row);
     setNotice({ state: "working", message: "Preparing the quotation document…" });
@@ -107,29 +114,33 @@ export default function DatabasePage({
         }
       }, 80);
     });
-  };
+  }, [preset]);
 
-  const rowActions = [
-    onLoadQuotation && {
-      label: "Load",
-      icon: SquarePen,
-      title: "Load this quotation into the form for editing",
-      onClick: handleLoadRow,
-    },
-    canDelete && {
-      label: "Delete",
-      icon: Trash2,
-      variant: "danger",
-      title: "Delete this quotation from the Google Sheet",
-      onClick: handleDeleteRow,
-    },
-    {
-      label: "View",
-      icon: FileText,
-      title: "View the generated quotation document (PDF)",
-      onClick: handleViewQuote,
-    },
-  ].filter(Boolean);
+  const rowActions = useMemo(
+    () =>
+      [
+        onLoadQuotation && {
+          label: "Load",
+          icon: SquarePen,
+          title: "Load this quotation into the form for editing",
+          onClick: handleLoadRow,
+        },
+        canDelete && {
+          label: "Delete",
+          icon: Trash2,
+          variant: "danger",
+          title: "Delete this quotation from the Google Sheet",
+          onClick: handleDeleteRow,
+        },
+        {
+          label: "View",
+          icon: FileText,
+          title: "View the generated quotation document (PDF)",
+          onClick: handleViewQuote,
+        },
+      ].filter(Boolean),
+    [onLoadQuotation, canDelete, handleLoadRow, handleDeleteRow, handleViewQuote]
+  );
 
   const exportCsv = () => {
     const name = `${preset?.name || "data"}-${new Date().toISOString().slice(0, 10)}.csv`;

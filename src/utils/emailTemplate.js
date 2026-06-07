@@ -3,6 +3,8 @@
  * and a sensible default template.
  */
 
+import { flattenFields } from "./subfields";
+
 /** Replace {{Header}} tokens in `text` with the row's value for that column. */
 export function applyPlaceholders(text, headers, row) {
   return String(text || "").replace(/\{\{\s*([^}]+?)\s*\}\}/g, (match, key) => {
@@ -18,9 +20,10 @@ export function applyPlaceholders(text, headers, row) {
  */
 export function findRowEmail(preset, headers, row) {
   const candidates = [];
-  preset.fields
-    .filter((f) => f.type === "email")
-    .forEach((f) => candidates.push(f.label));
+  // Email-type parent fields and subfields (matched by their column label).
+  flattenFields(preset.fields)
+    .filter((l) => l.field.type === "email")
+    .forEach((l) => candidates.push(l.columnLabel));
   headers.forEach((h) => {
     if (/e-?mail/i.test(h) && !candidates.includes(h)) candidates.push(h);
   });

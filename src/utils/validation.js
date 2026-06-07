@@ -5,6 +5,7 @@
 
 import { findDuplicateLabels } from "./googleLinks";
 import { validateFormula } from "./formula";
+import { flattenFields, getSubfields } from "./subfields";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[+]?[\d\s()-]{7,15}$/;
@@ -64,10 +65,10 @@ export function validateField(field, value) {
   }
 }
 
-/** Validate every field. Returns a map of { [fieldId]: errorString }. */
+/** Validate every field + subfield. Returns a map of { [fieldId]: errorString }. */
 export function validateForm(fields, values) {
   const errors = {};
-  fields.forEach((field) => {
+  flattenFields(fields).forEach(({ field }) => {
     if (field.calculated) return; // calculated fields have no user input
     const error = validateField(field, values[field.id]);
     if (error) errors[field.id] = error;
@@ -102,25 +103,32 @@ export function validatePreset(preset) {
   if (!preset.fields || preset.fields.length === 0) {
     errors.push("Add at least one field");
   }
-  // Labels usable inside a formula (number/boolean/other calculated fields).
+  // Labels usable inside a formula (number/boolean/calculated parent fields AND
+  // subfields).
   const usableLabels = (preset.fields || [])
+    .flatMap((f) => [f, ...getSubfields(f)])
     .filter((f) => f.type === "number" || f.type === "boolean" || f.calculated)
     .map((f) => f.label);
 
-  preset.fields?.forEach((f, i) => {
-    if (!f.label || !f.label.trim()) errors.push(`Field ${i + 1} needs a label`);
+  const validateOne = (f, name) => {
+    if (!f.label || !f.label.trim()) errors.push(`${name} needs a label`);
     if (!f.calculated && f.type === "dropdown" && (!f.options || f.options.length === 0)) {
-      errors.push(`"${f.label || `Field ${i + 1}`}" needs at least one dropdown option`);
+      errors.push(`"${f.label || name}" needs at least one dropdown option`);
     }
     if (f.calculated) {
       const check = validateFormula(
         f.formula || "",
         usableLabels.filter((l) => l !== f.label)
       );
-      if (!check.ok) {
-        errors.push(`"${f.label || `Field ${i + 1}`}" formula: ${check.error}`);
-      }
+      if (!check.ok) errors.push(`"${f.label || name}" formula: ${check.error}`);
     }
+  };
+
+  preset.fields?.forEach((f, i) => {
+    validateOne(f, `Field ${i + 1}`);
+    getSubfields(f).forEach((s, j) =>
+      validateOne(s, `Field ${i + 1} subfield ${j + 1}`)
+    );
   });
   // No two fields may share a label (placeholders must be unique).
   findDuplicateLabels(preset.fields || []).forEach((label) =>

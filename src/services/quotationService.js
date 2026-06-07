@@ -13,6 +13,7 @@ import { generateQuotationId } from "../utils/idGenerator";
 import { valueForExport } from "../utils/fieldFormatters";
 import { computeCalculatedValues, formatCalculated } from "../utils/formula";
 import { extractId } from "../utils/googleLinks";
+import { flattenFields } from "../utils/subfields";
 
 /** Export value for a field, computing calculated fields from the inputs. */
 function exportFieldValue(field, values, calcValues) {
@@ -47,11 +48,13 @@ export function presetDocId(preset) {
 /** Build the dynamic Sheets payload (headers + aligned row). */
 export function buildSheetPayload(preset, values, meta) {
   const calcValues = computeCalculatedValues(preset, values);
-  const fieldHeaders = preset.fields.map((f) => f.label);
+  // Parent fields + subfields become individual columns ("Parent - Sub").
+  const leaves = flattenFields(preset.fields);
+  const fieldHeaders = leaves.map((l) => l.columnLabel);
   const headers = [...METADATA_COLUMNS, ...fieldHeaders];
 
   const metaRow = [meta.quotationId, preset.name, meta.createdAt, meta.updatedAt];
-  const fieldRow = preset.fields.map((f) => exportFieldValue(f, values, calcValues));
+  const fieldRow = leaves.map((l) => exportFieldValue(l.field, values, calcValues));
 
   return {
     spreadsheetId: presetSheetId(preset),
@@ -63,10 +66,11 @@ export function buildSheetPayload(preset, values, meta) {
     headers,
     row: [...metaRow, ...fieldRow],
     // Structured copy, handy for debugging / future Apps Script logic.
-    fields: preset.fields.map((f) => ({
-      label: f.label,
-      type: f.calculated ? "calculated" : f.type,
-      value: exportFieldValue(f, values, calcValues),
+    fields: leaves.map((l) => ({
+      label: l.columnLabel,
+      type: l.field.calculated ? "calculated" : l.field.type,
+      isSubfield: l.isSub,
+      value: exportFieldValue(l.field, values, calcValues),
     })),
   };
 }
@@ -83,8 +87,8 @@ export function buildDocPayload(preset, values, meta) {
     "Preset Name": preset.name,
     "Created At": meta.createdAt,
   };
-  preset.fields.forEach((f) => {
-    placeholders[f.label] = exportFieldValue(f, values, calcValues);
+  flattenFields(preset.fields).forEach((l) => {
+    placeholders[l.columnLabel] = exportFieldValue(l.field, values, calcValues);
   });
 
   return {

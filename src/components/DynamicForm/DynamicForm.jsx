@@ -1,14 +1,15 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Eye, Pencil, X, Calculator } from "lucide-react";
 import FieldInput from "./FieldInput";
 import { emptyValueForField } from "../../utils/fieldFormatters";
 import { validateForm } from "../../utils/validation";
 import { computeCalculatedValues, formatCalculated } from "../../utils/formula";
+import { getSubfields, leafFields } from "../../utils/subfields";
 
 function initValues(preset, initialValues) {
   const values = {};
-  preset.fields.forEach((f) => {
+  leafFields(preset.fields).forEach((f) => {
     if (f.calculated) return; // calculated fields are derived, not entered
     values[f.id] =
       initialValues && f.id in initialValues ? initialValues[f.id] : emptyValueForField(f);
@@ -32,8 +33,10 @@ export default function DynamicForm({
   const [errors, setErrors] = useState({});
 
   const isEditMode = Boolean(editingQuotationId);
-  const inputFields = preset.fields.filter((f) => !f.calculated);
-  const calcFields = preset.fields.filter((f) => f.calculated);
+  const calcFields = useMemo(
+    () => preset.fields.filter((f) => f.calculated),
+    [preset]
+  );
 
   // Live calculated values recomputed on every input change.
   const calcValues = useMemo(
@@ -41,10 +44,12 @@ export default function DynamicForm({
     [preset, values]
   );
 
-  const setValue = (id, val) => {
+  // Stable setter so memoized FieldInputs only re-render when their own value
+  // changes. FieldInput passes (id, value).
+  const setValue = useCallback((id, val) => {
     setValues((prev) => ({ ...prev, [id]: val }));
-    if (errors[id]) setErrors((prev) => ({ ...prev, [id]: undefined }));
-  };
+    setErrors((prev) => (prev[id] ? { ...prev, [id]: undefined } : prev));
+  }, []);
 
   const handleContinue = () => {
     const found = validateForm(preset.fields, values);
@@ -109,15 +114,64 @@ export default function DynamicForm({
           transition={{ duration: 0.25 }}
         >
           <div className="form-grid">
-            {inputFields.map((field) => (
-              <FieldInput
-                key={field.id}
-                field={field}
-                value={values[field.id]}
-                error={errors[field.id]}
-                onChange={(val) => setValue(field.id, val)}
-              />
-            ))}
+            {preset.fields.map((field) => {
+              const subs = getSubfields(field);
+              // Calculated parent with no subfields lives in the side panel only.
+              if (field.calculated && subs.length === 0) return null;
+              // Simple field (no subfields) → normal grid cell.
+              if (!field.calculated && subs.length === 0) {
+                return (
+                  <FieldInput
+                    key={field.id}
+                    field={field}
+                    value={values[field.id]}
+                    error={errors[field.id]}
+                    onChange={setValue}
+                  />
+                );
+              }
+              // Field with subfields → full-width group with indented subfields.
+              return (
+                <div className="field-group" key={field.id}>
+                  {field.calculated ? (
+                    <div className="field-group-head">
+                      <span className="form-label">{field.label}</span>
+                      <span className="field-group-calc">
+                        <Calculator size={13} /> {formatCalculated(calcValues[field.id], field)}
+                      </span>
+                    </div>
+                  ) : (
+                    <FieldInput
+                      field={field}
+                      value={values[field.id]}
+                      error={errors[field.id]}
+                      onChange={setValue}
+                    />
+                  )}
+                  <div className="subfield-inputs">
+                    {subs.map((sub) =>
+                      sub.calculated ? (
+                        <div className="subfield-calc-row" key={sub.id}>
+                          <span className="subfield-calc-label">{sub.label}</span>
+                          <span className="subfield-calc-value">
+                            {formatCalculated(calcValues[sub.id], sub)}
+                          </span>
+                        </div>
+                      ) : (
+                        <FieldInput
+                          key={sub.id}
+                          field={sub}
+                          value={values[sub.id]}
+                          error={errors[sub.id]}
+                          onChange={setValue}
+                          compact
+                        />
+                      )
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="form-actions">

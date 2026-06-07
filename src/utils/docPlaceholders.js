@@ -4,6 +4,7 @@
  */
 
 import { computeCalculatedValues, formatCalculated } from "./formula";
+import { flattenFields } from "./subfields";
 
 export function buildDocPlaceholderMap(preset, values, quotationId) {
   const calc = values ? computeCalculatedValues(preset, values) : {};
@@ -12,12 +13,13 @@ export function buildDocPlaceholderMap(preset, values, quotationId) {
     "Quotation Number": quotationId || "",
     "Preset Name": preset.name,
   };
-  preset.fields.forEach((f) => {
+  // Parent fields + subfields, keyed by their column label ("Parent - Sub").
+  flattenFields(preset.fields).forEach(({ field: f, columnLabel }) => {
     let v = "";
     if (f.calculated) v = formatCalculated(calc[f.id], f);
     else if (f.type === "boolean") v = values?.[f.id] ? "Yes" : "No";
     else v = values?.[f.id] != null && values?.[f.id] !== "" ? String(values[f.id]) : "";
-    map[f.label] = v;
+    map[columnLabel] = v;
   });
   return map;
 }

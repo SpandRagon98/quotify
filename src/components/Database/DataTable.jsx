@@ -1,3 +1,4 @@
+import { memo } from "react";
 import StatusBadge from "./StatusBadge";
 
 /**
@@ -5,8 +6,11 @@ import StatusBadge from "./StatusBadge";
  *
  * `rowActions` = array of { label, icon, title, variant?, onClick(row) } rendered
  * in an Actions column. `statusColumns` headers render as coloured status badges.
+ *
+ * Memoized: with stable callbacks/actions from the parent it skips re-rendering
+ * when unrelated state (status banners, etc.) changes.
  */
-export default function DataTable({
+function DataTable({
   headers,
   rows,
   filters,
@@ -80,3 +84,5 @@ export default function DataTable({
     </div>
   );
 }
+
+export default memo(DataTable);

@@ -1,9 +1,15 @@
+import { memo } from "react";
 import { isInputAllowed } from "../../utils/validation";
 
-/** Renders the correct control for a field type, with live input filtering. */
-export default function FieldInput({ field, value, error, onChange }) {
+/**
+ * Renders the correct control for a field type, with live input filtering.
+ * `onChange(fieldId, value)` is called so a single stable parent callback can be
+ * reused across every input — memoized so only the edited field re-renders.
+ */
+function FieldInput({ field, value, error, onChange, compact = false }) {
+  const emit = (next) => onChange(field.id, next);
   const handle = (next) => {
-    if (isInputAllowed(field, String(next))) onChange(next);
+    if (isInputAllowed(field, String(next))) emit(next);
   };
 
   const common = {
@@ -19,7 +25,7 @@ export default function FieldInput({ field, value, error, onChange }) {
           {...common}
           rows={4}
           value={value ?? ""}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => emit(e.target.value)}
         />
       );
       break;
@@ -30,7 +36,7 @@ export default function FieldInput({ field, value, error, onChange }) {
           <input
             type="checkbox"
             checked={Boolean(value)}
-            onChange={(e) => onChange(e.target.checked)}
+            onChange={(e) => emit(e.target.checked)}
           />
           <span className="switch-track"><span className="switch-thumb" /></span>
           <span className="switch-text">{value ? "Yes" : "No"}</span>
@@ -44,7 +50,7 @@ export default function FieldInput({ field, value, error, onChange }) {
           {...common}
           type="date"
           value={value ?? ""}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => emit(e.target.value)}
         />
       );
       break;
@@ -54,7 +60,7 @@ export default function FieldInput({ field, value, error, onChange }) {
         <select
           {...common}
           value={value ?? ""}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => emit(e.target.value)}
         >
           <option value="">Select…</option>
           {(field.options || []).map((opt) => (
@@ -82,7 +88,7 @@ export default function FieldInput({ field, value, error, onChange }) {
           {...common}
           type="email"
           value={value ?? ""}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => emit(e.target.value)}
         />
       );
       break;
@@ -110,7 +116,11 @@ export default function FieldInput({ field, value, error, onChange }) {
   }
 
   return (
-    <div className={`form-field ${field.type === "longtext" ? "form-field-wide" : ""}`}>
+    <div
+      className={`form-field ${field.type === "longtext" ? "form-field-wide" : ""} ${
+        compact ? "form-field-compact" : ""
+      }`}
+    >
       <span className="form-label">
         {field.label}
         {field.required && <span className="req">*</span>}
@@ -120,3 +130,5 @@ export default function FieldInput({ field, value, error, onChange }) {
     </div>
   );
 }
+
+export default memo(FieldInput);

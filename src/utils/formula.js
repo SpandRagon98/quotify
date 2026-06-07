@@ -6,6 +6,8 @@
  * field references by label (which may contain spaces, e.g. "Door Qty").
  */
 
+import { leafFields } from "./subfields";
+
 const OPS = { "+": 1, "-": 1, "*": 2, "/": 2 };
 
 /** Coerce any value to a finite number (0 otherwise). */
@@ -191,16 +193,19 @@ function effectiveNumber(field, inputValues) {
  * @returns {Object<string, number>} map of calculatedFieldId → number
  */
 export function computeCalculatedValues(preset, inputValues) {
+  // Flatten so subfields participate in calculations too (both as inputs to a
+  // formula and as calculated targets), evaluated in document order.
+  const leaves = leafFields(preset.fields);
   const context = {};
-  // Seed context with non-calculated numeric/boolean fields.
-  preset.fields.forEach((f) => {
+  // Seed context with non-calculated numeric/boolean leaf fields.
+  leaves.forEach((f) => {
     if (!f.calculated && (f.type === "number" || f.type === "boolean")) {
       context[f.label.trim().toLowerCase()] = effectiveNumber(f, inputValues);
     }
   });
 
   const result = {};
-  preset.fields.forEach((f) => {
+  leaves.forEach((f) => {
     if (f.calculated) {
       const value = evaluateFormula(f.formula, context);
       result[f.id] = value;

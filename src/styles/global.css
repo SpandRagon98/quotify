@@ -143,14 +143,17 @@ body {
   letter-spacing: -0.006em;
 }
 
-/* Slowly drifting gradient wash */
+/* Slowly drifting gradient wash. Transform-only animation (compositor-driven,
+   no per-frame repaint) for smooth 60fps. */
 body::before {
-  content: ""; position: fixed; inset: -12%; z-index: 0; pointer-events: none;
+  content: ""; position: fixed; inset: -22%; z-index: 0; pointer-events: none;
   background-image: var(--app-gradient);
-  background-size: 170% 170%;
+  background-size: 150% 150%;
   animation: bgShift 46s ease-in-out infinite alternate;
+  will-change: transform;
 }
-/* Subtle animated aura field — drifts AND slowly shifts colour (very subtle). */
+/* Subtle animated aura field — drifts via transform only; blur is static so the
+   blurred layer is painted once and merely composited. */
 body::after {
   content: ""; position: fixed; inset: -20%; z-index: 0; pointer-events: none;
   background:
@@ -158,30 +161,30 @@ body::after {
     radial-gradient(32% 32% at 84% 18%, var(--aura-2), transparent 70%),
     radial-gradient(42% 42% at 64% 86%, var(--aura-3), transparent 72%),
     radial-gradient(30% 30% at 30% 78%, var(--aura-4), transparent 72%);
-  animation: auraDrift 32s ease-in-out infinite alternate, auraHue 90s linear infinite;
-  will-change: transform, filter;
+  filter: blur(60px) saturate(1.06);
+  animation: auraDrift 32s ease-in-out infinite alternate;
+  will-change: transform;
 }
 #root { position: relative; z-index: 1; }
 
 @keyframes bgShift {
-  0%   { background-position: 0% 0%; transform: translate3d(0, 0, 0); }
-  50%  { background-position: 100% 50%; transform: translate3d(1.2%, -1.2%, 0); }
-  100% { background-position: 50% 100%; transform: translate3d(-1.2%, 1.2%, 0); }
+  0%   { transform: translate3d(0, 0, 0); }
+  50%  { transform: translate3d(2.4%, -2.4%, 0); }
+  100% { transform: translate3d(-2.4%, 2.4%, 0); }
 }
 @keyframes auraDrift {
   0%   { transform: translate3d(0, 0, 0) scale(1); }
   50%  { transform: translate3d(2%, -1.6%, 0) scale(1.07); }
   100% { transform: translate3d(-2%, 2%, 0) scale(1.04); }
 }
-/* Gentle colour cycle — keep blur inside the keyframe so it persists. */
-@keyframes auraHue {
-  0%   { filter: blur(64px) hue-rotate(0deg) saturate(1); }
-  50%  { filter: blur(64px) hue-rotate(18deg) saturate(1.12); }
-  100% { filter: blur(64px) hue-rotate(0deg) saturate(1); }
-}
 @media (prefers-reduced-motion: reduce) {
   body::before, body::after { animation: none; }
-  body::after { filter: blur(64px); }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 button { font-family: inherit; }
@@ -396,6 +399,31 @@ button { font-family: inherit; }
 }
 .form-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .form-field-wide { grid-column: 1 / -1; }
+
+/* ----- Field groups with subfields (quotation form) ----- */
+.field-group {
+  grid-column: 1 / -1; display: flex; flex-direction: column; gap: 12px;
+  padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+.field-group-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.field-group-calc {
+  display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-display);
+  font-weight: 700; color: var(--brand-700); font-size: 14px;
+}
+.subfield-inputs {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px;
+  margin-left: 16px; padding-left: 14px; border-left: 2px solid var(--brand-soft);
+}
+.form-field-compact .form-label { font-size: 11.5px; color: var(--text-muted); }
+.subfield-calc-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 12px; border-radius: var(--radius-sm);
+  background: var(--surface); border: 1px solid var(--border);
+}
+.subfield-calc-label { font-size: 12px; font-weight: 600; color: var(--text-soft); }
+.subfield-calc-value { font-family: var(--font-display); font-weight: 700; color: var(--brand-700); font-size: 13px; }
+@media (max-width: 640px) { .subfield-inputs { grid-template-columns: 1fr; } }
 .form-label {
   font-size: 12px; font-weight: 600; color: var(--text-soft);
   letter-spacing: 0.01em; display: inline-flex; align-items: center; gap: 6px;
@@ -543,6 +571,7 @@ textarea.control { resize: vertical; }
   border: 1px solid var(--border-strong); border-radius: 999px;
   background: var(--surface); padding: 6px 8px 6px 14px;
 }
+.placeholder-chip-sub { border-style: dashed; background: var(--surface-2); }
 .placeholder-chip code {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 13px; color: var(--brand-700);
@@ -738,6 +767,36 @@ textarea.control { resize: vertical; }
 .field-editor-foot .toggle-row { margin-top: 0; }
 .review-item-calc { border-color: #d7daff; background: var(--brand-soft); }
 .review-item-calc .review-value { color: var(--brand-700); }
+
+/* ----- Subfields editor (preset builder) ----- */
+.subfield-section {
+  margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border-strong);
+}
+.subfield-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.subfield-section-title {
+  display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-soft);
+}
+.subfield-count {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  background: var(--brand-soft); color: var(--brand-700); font-size: 11px; font-weight: 700;
+  display: inline-grid; place-items: center;
+}
+.subfield-hint { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin: 8px 0 0; }
+.subfield-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.subfield-editor {
+  margin-left: 16px; padding: 12px 14px; border-radius: var(--radius-md);
+  border: 1px solid var(--border); border-left: 3px solid var(--brand-soft);
+  background: var(--surface-2);
+}
+.subfield-editor-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.subfield-tag {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 700;
+  color: var(--text-soft);
+}
+.subfield-editor-foot { display: flex; gap: 20px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+.subfield-editor-foot .toggle-row { margin-top: 0; }
+@media (max-width: 640px) { .subfield-editor { margin-left: 0; } }
 
 /* ---------- Collapsed sidebar fix ---------- */
 .brand-mark { flex-shrink: 0; }
@@ -956,6 +1015,14 @@ textarea.control { resize: vertical; }
 .doc-table tbody tr:first-child td { border-top: none; }
 .doc-field { font-weight: 600; color: var(--text-soft); }
 .doc-value { color: var(--text); white-space: pre-wrap; }
+
+/* Subfield rows — indented bullets, smaller and subtle. */
+.doc-subrow td { border-top: 1px dashed var(--border); padding-top: 8px; padding-bottom: 8px; }
+.doc-field.doc-subfield {
+  padding-left: 30px; position: relative; font-weight: 500; font-size: 12px; color: var(--text-muted);
+}
+.doc-sub-bullet { position: absolute; left: 16px; color: var(--brand); font-weight: 700; }
+.doc-value.doc-subvalue { font-size: 12px; color: var(--text-soft); }
 .doc-token {
   display: inline-flex; align-items: center; gap: 8px;
   background: var(--brand-soft); border: 1px solid var(--glass-border); border-radius: 8px;

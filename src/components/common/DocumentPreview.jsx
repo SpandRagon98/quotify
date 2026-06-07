@@ -1,10 +1,11 @@
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { Upload, X, Copy, Check, EyeOff, RotateCcw, Plus, Image as ImageIcon } from "lucide-react";
 import Logo from "./Logo";
 import { APP } from "../../config/appConfig";
 import { formatFieldValue } from "../../utils/fieldFormatters";
 import { computeCalculatedValues, formatCalculated } from "../../utils/formula";
 import { buildDocPlaceholderMap, replaceDocPlaceholders } from "../../utils/docPlaceholders";
+import { flattenFields, getSubfields, subColumnLabel } from "../../utils/subfields";
 
 function makePicker(onPick) {
   return (e) => {
@@ -57,11 +58,13 @@ export default function DocumentPreview({
   const calc = isTemplate ? {} : computeCalculatedValues(preset, values);
   const placeholderMap = buildDocPlaceholderMap(preset, values, quotationId);
 
-  const visibleFields = preset.fields.filter((f) => !hiddenFields.includes(f.id));
-  const hidden = preset.fields.filter((f) => hiddenFields.includes(f.id));
+  // All hidden leaves (parent fields + subfields) for the restore panel.
+  const hiddenLeaves = flattenFields(preset.fields).filter((l) =>
+    hiddenFields.includes(l.valueId)
+  );
 
-  const cellValue = (field) => {
-    if (isTemplate) return `{{${field.label}}}`;
+  const cellValue = (field, columnLabel) => {
+    if (isTemplate) return `{{${columnLabel}}}`;
     if (field.calculated) return formatCalculated(calc[field.id], field);
     return formatFieldValue(field, values[field.id]);
   };
@@ -155,42 +158,77 @@ export default function DocumentPreview({
           </tr>
         </thead>
         <tbody>
-          {visibleFields.map((field) => {
-            const value = cellValue(field);
+          {preset.fields.map((field) => {
+            if (hiddenFields.includes(field.id)) return null; // parent hidden → hide its subfields too
+            const value = cellValue(field, field.label);
+            const subs = getSubfields(field);
             return (
-              <tr key={field.id}>
-                <td className="doc-field">{field.label}</td>
-                <td className="doc-value">
-                  <span className="doc-value-inner">
-                    {isTemplate ? (
-                      <button className="doc-token" title={`Copy ${value}`} onClick={() => copyToken(value)}>
-                        <code>{value}</code>
-                        {copied === value ? <Check size={13} /> : <Copy size={13} />}
+              <Fragment key={field.id}>
+                <tr>
+                  <td className="doc-field">{field.label}</td>
+                  <td className="doc-value">
+                    <span className="doc-value-inner">
+                      {isTemplate ? (
+                        <button className="doc-token" title={`Copy ${value}`} onClick={() => copyToken(value)}>
+                          <code>{value}</code>
+                          {copied === value ? <Check size={13} /> : <Copy size={13} />}
+                        </button>
+                      ) : (
+                        value
+                      )}
+                    </span>
+                    {editFields && (
+                      <button className="doc-hide-btn" title="Hide from document" onClick={() => onToggleField?.(field.id)}>
+                        <EyeOff size={14} />
                       </button>
-                    ) : (
-                      value
                     )}
-                  </span>
-                  {editFields && (
-                    <button className="doc-hide-btn" title="Hide from document" onClick={() => onToggleField?.(field.id)}>
-                      <EyeOff size={14} />
-                    </button>
-                  )}
-                </td>
-              </tr>
+                  </td>
+                </tr>
+
+                {subs.map((sub) => {
+                  if (hiddenFields.includes(sub.id)) return null;
+                  const colLabel = subColumnLabel(field, sub);
+                  const subVal = cellValue(sub, colLabel);
+                  return (
+                    <tr key={sub.id} className="doc-subrow">
+                      <td className="doc-field doc-subfield">
+                        <span className="doc-sub-bullet">•</span>
+                        {sub.label}
+                      </td>
+                      <td className="doc-value doc-subvalue">
+                        <span className="doc-value-inner">
+                          {isTemplate ? (
+                            <button className="doc-token" title={`Copy ${subVal}`} onClick={() => copyToken(subVal)}>
+                              <code>{subVal}</code>
+                              {copied === subVal ? <Check size={13} /> : <Copy size={13} />}
+                            </button>
+                          ) : (
+                            subVal
+                          )}
+                        </span>
+                        {editFields && (
+                          <button className="doc-hide-btn" title="Hide from document" onClick={() => onToggleField?.(sub.id)}>
+                            <EyeOff size={14} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </Fragment>
             );
           })}
         </tbody>
       </table>
 
-      {/* Restore hidden fields (Doc View edit) */}
-      {editFields && hidden.length > 0 && (
+      {/* Restore hidden fields / subfields (Doc View edit) */}
+      {editFields && hiddenLeaves.length > 0 && (
         <div className="doc-hidden-panel">
           <span className="doc-hidden-label">Hidden fields</span>
           <div className="doc-hidden-list">
-            {hidden.map((f) => (
-              <button key={f.id} className="doc-restore-chip" onClick={() => onToggleField?.(f.id)}>
-                <RotateCcw size={12} /> {f.label}
+            {hiddenLeaves.map((l) => (
+              <button key={l.valueId} className="doc-restore-chip" onClick={() => onToggleField?.(l.valueId)}>
+                <RotateCcw size={12} /> {l.columnLabel}
               </button>
             ))}
           </div>

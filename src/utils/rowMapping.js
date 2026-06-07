@@ -4,6 +4,7 @@
  */
 
 import { METADATA_COLUMNS } from "../config/appConfig";
+import { flattenFields } from "./subfields";
 
 /** Convert a stored cell back to the field's working value. */
 function coerceForField(field, raw) {
@@ -30,9 +31,11 @@ export function rowToFormValues(preset, headers, row) {
   };
 
   const values = {};
-  preset.fields.forEach((f) => {
-    if (f.calculated) return; // calculated fields are recomputed from inputs
-    values[f.id] = coerceForField(f, cell(f.label));
+  // Parent fields and subfields are stored in their own columns; load both by
+  // their column label ("Parent" / "Parent - Sub").
+  flattenFields(preset.fields).forEach((leaf) => {
+    if (leaf.field.calculated) return; // calculated values are recomputed from inputs
+    values[leaf.valueId] = coerceForField(leaf.field, cell(leaf.columnLabel));
   });
 
   return {

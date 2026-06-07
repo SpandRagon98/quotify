@@ -27,6 +27,8 @@ export default function FieldBuilder({ fields, onFieldsChange }) {
         suffix: "",
         // Optional toggle that gates a number field to 0 when off.
         gateFieldId: "",
+        // Optional manual/calculated subfields shown indented under this field.
+        subfields: [],
       },
     ]);
   };

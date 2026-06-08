@@ -1,10 +1,13 @@
 /**
- * App appearance settings: theme mode (light/dark) + accent color.
+ * App appearance settings: theme mode (light/dark/glass) + accent color.
  * Persisted to localStorage and applied to <html data-theme data-accent>.
  */
 
 import { useEffect, useState } from "react";
 import { STORAGE_KEYS } from "../config/appConfig";
+
+/** Supported theme modes. Anything else falls back to light. */
+const MODES = ["light", "dark", "glass"];
 
 function load() {
   try {
@@ -12,7 +15,7 @@ function load() {
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
-        mode: parsed.mode === "dark" ? "dark" : "light",
+        mode: MODES.includes(parsed.mode) ? parsed.mode : "light",
         accent: parsed.accent || "indigo",
       };
     }

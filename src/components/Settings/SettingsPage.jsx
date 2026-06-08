@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Sun, Moon, Check, Upload, User as UserIcon, Save } from "lucide-react";
+import { Sun, Moon, Sparkles, Check, Upload, User as UserIcon, Save } from "lucide-react";
 import { ACCENTS } from "../../config/appConfig";
 
 export default function SettingsPage({ settings, setMode, setAccent, user, onUpdateProfile }) {
@@ -53,7 +53,18 @@ export default function SettingsPage({ settings, setMode, setAccent, user, onUpd
             >
               <Moon size={16} /> Dark
             </button>
+            <button
+              className={`mode-pill ${settings.mode === "glass" ? "is-active" : ""}`}
+              onClick={() => setMode("glass")}
+            >
+              <Sparkles size={16} /> Glass
+            </button>
           </div>
+          {settings.mode === "glass" && (
+            <p className="form-hint settings-glass-hint">
+              Premium frosted glass interface. Your accent color stays, softened for an elegant Apple-style look.
+            </p>
+          )}
         </div>
 
         <div className="settings-block">

@@ -34,9 +34,12 @@
   /* Glass (stronger frosted feel) — borders carry a faint accent tint. */
   --glass-bg: rgba(255, 255, 255, 0.6);
   --glass-bg-2: rgba(255, 255, 255, 0.45);
+  --glass-bg-strong: rgba(255, 255, 255, 0.86);
   --glass-border: color-mix(in srgb, var(--brand) 9%, rgba(255, 255, 255, 0.82));
   --glass-blur: 22px;
   --glass-highlight: rgba(255, 255, 255, 0.5);
+  --glass-shadow: var(--shadow-md);
+  --glass-accent: color-mix(in srgb, var(--brand) 14%, rgba(255, 255, 255, 0.7));
 
   /* Animated background aura — thin, subtle, accent-tinted. */
   --aura-1: color-mix(in srgb, var(--brand) 13%, transparent);
@@ -106,8 +109,11 @@
 
   --glass-bg: rgba(26, 28, 38, 0.55);
   --glass-bg-2: rgba(26, 28, 38, 0.38);
+  --glass-bg-strong: rgba(22, 24, 33, 0.9);
   --glass-border: color-mix(in srgb, var(--brand) 16%, rgba(255, 255, 255, 0.08));
   --glass-highlight: rgba(255, 255, 255, 0.06);
+  --glass-shadow: var(--shadow-md);
+  --glass-accent: color-mix(in srgb, var(--brand) 22%, rgba(255, 255, 255, 0.04));
 
   /* Accent-derived (dark): brighter mixes so tints read on the dark surfaces. */
   --brand-soft: color-mix(in srgb, var(--brand) 26%, transparent);
@@ -131,6 +137,172 @@
 
   color-scheme: dark;
 }
+
+/* =====================================================================
+   GLASS MODE — premium Apple-style frosted glass.
+   Centralised here: token overrides reskin every panel that already uses
+   the shared glass + surface tokens; the scoped rules below add the
+   extra frost, reflections and softened accents.
+   NOTE: the surface tokens stay opaque on purpose so dialogs + inputs read
+   clearly and the native PDF capture (painted on --surface) is unaffected.
+   ===================================================================== */
+[data-theme="glass"] {
+  color-scheme: light;
+
+  /* Living, soft, multi-hue wallpaper behind the glass layers. */
+  --bg: #e9eef8;
+  --app-gradient:
+    radial-gradient(1100px 720px at 6% -10%, color-mix(in srgb, var(--brand) 22%, transparent), transparent 60%),
+    radial-gradient(950px 700px at 104% -2%, rgba(120, 170, 255, 0.30), transparent 58%),
+    radial-gradient(1000px 760px at 100% 110%, color-mix(in srgb, var(--brand) 17%, transparent), transparent 60%),
+    radial-gradient(820px 640px at -8% 112%, rgba(255, 176, 214, 0.24), transparent 58%),
+    linear-gradient(180deg, #eef2fb 0%, #e6ecf7 100%);
+
+  /* Opaque base surfaces — keep dialogs, inputs and the PDF readable. */
+  --surface: #ffffff;
+  --surface-2: #f3f5fc;
+
+  /* Hairline glass borders + crisp dark text for contrast. */
+  --border: rgba(118, 128, 158, 0.20);
+  --border-strong: rgba(108, 118, 148, 0.32);
+  --text: #161922;
+  --text-soft: #474d61;
+  --text-muted: #79809a;
+
+  /* Frosted glass tokens — translucent COLOURS only (no gradient → PDF-safe). */
+  --glass-bg: rgba(255, 255, 255, 0.46);
+  --glass-bg-2: rgba(255, 255, 255, 0.34);
+  --glass-bg-strong: rgba(255, 255, 255, 0.82);
+  --glass-border: color-mix(in srgb, var(--brand) 14%, rgba(255, 255, 255, 0.62));
+  --glass-highlight: rgba(255, 255, 255, 0.85);
+  --glass-shadow: 0 14px 44px rgba(33, 43, 78, 0.16), 0 2px 8px rgba(33, 43, 78, 0.08);
+  --glass-accent: color-mix(in srgb, var(--brand) 24%, rgba(255, 255, 255, 0.55));
+  --glass-blur: 26px;
+
+  /* Softened accent — subtle tints, gentle rings. */
+  --brand-soft: color-mix(in srgb, var(--brand) 13%, rgba(255, 255, 255, 0.62));
+  --brand-ring: color-mix(in srgb, var(--brand) 22%, transparent);
+  --info-soft: var(--brand-soft);
+
+  /* Aura — present but soft and multi-hued. */
+  --aura-1: color-mix(in srgb, var(--brand) 20%, transparent);
+  --aura-2: rgba(120, 170, 255, 0.22);
+  --aura-3: color-mix(in srgb, var(--brand-700) 15%, transparent);
+  --aura-4: rgba(255, 172, 212, 0.18);
+
+  /* Sidebar — translucent frosted rail. */
+  --sidebar-bg: rgba(255, 255, 255, 0.42);
+  --sidebar-text: #474d61;
+  --sidebar-text-strong: #161922;
+  --sidebar-hover: color-mix(in srgb, var(--brand) 11%, rgba(255, 255, 255, 0.4));
+
+  --danger-soft: rgba(229, 72, 77, 0.12);
+  --success-soft: rgba(43, 154, 102, 0.14);
+
+  /* Soft, layered shadows (no harsh edges). */
+  --shadow-sm: 0 1px 2px rgba(33, 43, 78, 0.05), 0 4px 14px rgba(33, 43, 78, 0.06);
+  --shadow-md: 0 14px 40px rgba(33, 43, 78, 0.12);
+  --shadow-lg: 0 26px 70px rgba(33, 43, 78, 0.20);
+}
+
+/* ---- Glass: extra frost + soft top-light reflections on key panels ---- */
+[data-theme="glass"] .card,
+[data-theme="glass"] .stat-card,
+[data-theme="glass"] .preset-tile,
+[data-theme="glass"] .preset-row,
+[data-theme="glass"] .table-wrap,
+[data-theme="glass"] .auth-card,
+[data-theme="glass"] .notif-panel,
+[data-theme="glass"] .modal {
+  position: relative;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+/* The reflection itself — a thin top rim-light + faint corner sheen. Painted
+   with very low alpha so text under it stays perfectly legible. Kept off the
+   off-screen PDF stage so captures are never affected. */
+[data-theme="glass"] .card::after,
+[data-theme="glass"] .stat-card::after,
+[data-theme="glass"] .preset-tile::after,
+[data-theme="glass"] .table-wrap::after,
+[data-theme="glass"] .auth-card::after,
+[data-theme="glass"] .notif-panel::after,
+[data-theme="glass"] .modal::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0, rgba(255, 255, 255, 0) 9px),
+    radial-gradient(150% 64% at 0% 0%, rgba(255, 255, 255, 0.16), transparent 44%);
+}
+[data-theme="glass"] .pdf-stage .doc-paper::after { display: none; }
+
+/* Frosted dialogs / dropdowns — stronger fill so they stay clearly readable. */
+[data-theme="glass"] .modal,
+[data-theme="glass"] .notif-panel,
+[data-theme="glass"] .doc-paper {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(calc(var(--glass-blur) + 6px)) saturate(140%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 6px)) saturate(140%);
+  border-color: var(--glass-border);
+}
+[data-theme="glass"] .modal-foot { background: rgba(255, 255, 255, 0.4); }
+
+/* Empty states become frosted panels instead of flat surfaces. */
+[data-theme="glass"] .empty-state {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-color: var(--glass-border);
+}
+
+/* Inputs & search — translucent over the frosted card (no extra blur layer →
+   cheap), with a clear border so fields stay easy to identify. */
+[data-theme="glass"] .control,
+[data-theme="glass"] .th-filter {
+  background: var(--glass-bg-2);
+  border-color: var(--border-strong);
+}
+[data-theme="glass"] .search-box {
+  background: var(--glass-bg-2);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-color: var(--border-strong);
+}
+
+/* Active sidebar tab — frosted accent panel: clearly highlighted, not loud. */
+[data-theme="glass"] .nav-item.is-active {
+  background: var(--glass-accent);
+  color: var(--brand-700);
+  box-shadow: inset 0 0 0 1px var(--glass-border), 0 3px 12px var(--brand-ring);
+}
+
+/* Primary button — keep it as the visible CTA but add a glass rim + soft glow. */
+[data-theme="glass"] .btn-primary {
+  border: 1px solid color-mix(in srgb, var(--brand) 42%, rgba(255, 255, 255, 0.4));
+  box-shadow: 0 6px 20px var(--brand-ring), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* Soft + ghost buttons and chips read as gentle frosted accents. */
+[data-theme="glass"] .icon-btn {
+  background: var(--glass-bg-2);
+  border-color: var(--glass-border);
+}
+
+/* Fallback for browsers without backdrop-filter: lean on more opaque fills so
+   the UI never turns into unreadable see-through panels. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-theme="glass"] {
+    --glass-bg: rgba(255, 255, 255, 0.9);
+    --glass-bg-2: rgba(255, 255, 255, 0.82);
+    --glass-bg-strong: rgba(255, 255, 255, 0.96);
+    --sidebar-bg: rgba(255, 255, 255, 0.92);
+  }
+}
+
+/* Smooth, cheap cross-fade when switching Light / Dark / Glass. */
+html { transition: background-color 0.3s ease; }
+body { transition: background-color 0.3s ease, color 0.25s ease; }
 
 * { box-sizing: border-box; }
 

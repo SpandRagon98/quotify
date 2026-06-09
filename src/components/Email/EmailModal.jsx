@@ -18,9 +18,12 @@ import DocumentPreview from "../common/DocumentPreview";
 import { applyPlaceholders, findRowEmail, defaultEmailTemplate } from "../../utils/emailTemplate";
 import { rowToFormValues } from "../../utils/rowMapping";
 import { elementToPdfBase64 } from "../../utils/pdf";
+import { buildQuoteEmailHtml } from "../../utils/emailHtml";
 import { sendQuotationEmail } from "../../services/emailService";
+import { sendViaResend } from "../../services/resendClient";
 import { presetSheetId, presetDocId } from "../../services/quotationService";
 import { useCompanyProfile } from "../../hooks/useCompanyProfile";
+import { APP, EMAIL } from "../../config/appConfig";
 import {
   trackingEnabled,
   createTrackedQuote,
@@ -53,6 +56,11 @@ export default function EmailModal({
   const [trackOn, setTrackOn] = useState(canTrack);
   const [trackLink, setTrackLink] = useState("");
   const [tracking, setTracking] = useState(null); // latest tracked quote status
+
+  // Email delivery path (Phase 2). Resend is selectable only in cloud mode.
+  const [provider, setProvider] = useState(
+    canTrack && EMAIL.PROVIDER === "resend" ? "resend" : "appsscript"
+  );
 
   const subjectRef = useRef(null);
   const bodyRef = useRef(null);
@@ -118,15 +126,21 @@ export default function EmailModal({
     setStatus({ state: "saved", message: "Template saved for this preset." });
   };
 
+  const accentColor = () =>
+    getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#635bff";
+
   const handleSend = async () => {
     if (!recipient) {
       setStatus({ state: "error", message: "No email address found in this row." });
       return;
     }
+    // Resend's tokenized CTA buttons require a tracked link — force tracking on.
+    const useResend = provider === "resend" && canTrack;
+    const wantTrack = trackOn || useResend;
     try {
       // Tracked quote: create the shareable link first so it can be embedded.
       let trackUrl = "";
-      if (trackOn && canTrack) {
+      if (wantTrack && canTrack) {
         setStatus({ state: "sending", message: "Creating tracking link…" });
         const created = await createTrackedQuote({
           quotationId: quotationId || rowDoc.quotationId,
@@ -138,27 +152,58 @@ export default function EmailModal({
         setTrackLink(trackUrl);
       }
 
-      // Substitute placeholders, then weave in the tracking link.
-      let finalBody = applyPlaceholders(body, headers, row);
-      if (trackUrl) {
-        finalBody = finalBody.includes("{{Quote Link}}")
-          ? finalBody.split("{{Quote Link}}").join(trackUrl)
-          : `${finalBody}\n\n— — —\nView your quotation online and respond:\n${trackUrl}`;
-      } else {
-        finalBody = finalBody.split("{{Quote Link}}").join("");
+      const finalSubject = applyPlaceholders(subject, headers, row);
+      const renderedBody = applyPlaceholders(body, headers, row);
+      const hadLinkToken = renderedBody.includes("{{Quote Link}}");
+      const messageText = renderedBody.split("{{Quote Link}}").join(trackUrl || "");
+      const fileName = `${preset.name}-${quotationId || "quotation"}.pdf`;
+
+      // ---- Resend: branded HTML + tokenized CTAs to our own backend ----
+      if (useResend) {
+        if (attachMode === "googledoc") {
+          setStatus({
+            state: "error",
+            message:
+              "Google Doc PDF export is only available on the Gmail path. Choose Native PDF or No attachment for Resend.",
+          });
+          return;
+        }
+        const html = buildQuoteEmailHtml({
+          brandName: APP.name,
+          companyLogo: logo || "",
+          bodyText: messageText,
+          quotationId,
+          presetName: preset.name,
+          quoteUrl: trackUrl,
+          accent: accentColor(),
+        });
+        const attachments = [];
+        if (attachMode === "native") {
+          setStatus({ state: "sending", message: "Generating PDF attachment…" });
+          attachments.push({ filename: fileName, content: await elementToPdfBase64(pdfStageRef.current) });
+        }
+        setStatus({ state: "sending", message: "Sending branded email via Resend…" });
+        await sendViaResend({ to: recipient, subject: finalSubject, html, text: messageText, attachments });
+        setStatus({ state: "sent", message: `Branded email sent to ${recipient} via Resend.` });
+        if (canTrack) latestTrackedQuote(quotationId).then(setTracking);
+        return;
       }
 
+      // ---- Gmail / Apps Script (existing path, unchanged) ----
+      const appsBody =
+        trackUrl && !hadLinkToken
+          ? `${messageText}\n\n— — —\nView your quotation online and respond:\n${trackUrl}`
+          : messageText;
       const payload = {
         to: recipient,
-        subject: applyPlaceholders(subject, headers, row),
-        body: finalBody,
+        subject: finalSubject,
+        body: appsBody,
         quotationId,
         presetName: preset.name,
         spreadsheetId: presetSheetId(preset),
         sheetTabName: preset.sheetTabName,
         companyLogo: logo || "",
       };
-      const fileName = `${preset.name}-${quotationId || "quotation"}.pdf`;
 
       if (attachMode === "native") {
         setStatus({ state: "sending", message: "Generating PDF attachment…" });
@@ -191,8 +236,12 @@ export default function EmailModal({
 
   const previewSubject = row ? applyPlaceholders(subject, headers, row) : subject;
   const rawPreviewBody = row ? applyPlaceholders(body, headers, row) : body;
+  // On the Resend path the CTAs are real buttons (shown below), so the body just
+  // drops the {{Quote Link}} token; on the Gmail path we show the inline link.
   const previewBody =
-    trackOn && canTrack
+    provider === "resend" && canTrack
+      ? rawPreviewBody.split("{{Quote Link}}").join("")
+      : trackOn && canTrack
       ? rawPreviewBody.includes("{{Quote Link}}")
         ? rawPreviewBody.split("{{Quote Link}}").join("🔗 [your tracked quotation link]")
         : `${rawPreviewBody}\n\n— — —\nView your quotation online and respond:\n🔗 [your tracked quotation link]`
@@ -280,6 +329,35 @@ export default function EmailModal({
               ))}
             </div>
           </div>
+
+          {/* Delivery path (Phase 2): branded Resend vs Gmail/Apps Script */}
+          {canTrack && (
+            <div className="form-field">
+              <span className="form-label"><Send size={13} /> Send with</span>
+              <div className="attach-toggle">
+                <button
+                  className={`attach-btn ${provider === "resend" ? "is-active" : ""}`}
+                  onClick={() => setProvider("resend")}
+                  title="Branded email from your domain, with secure tokenized response buttons"
+                >
+                  Resend (branded)
+                </button>
+                <button
+                  className={`attach-btn ${provider === "appsscript" ? "is-active" : ""}`}
+                  onClick={() => setProvider("appsscript")}
+                  title="Send through the existing Google Apps Script / Gmail path"
+                >
+                  Gmail
+                </button>
+              </div>
+              {provider === "resend" && (
+                <p className="form-hint track-hint">
+                  Branded HTML from your verified domain. Approve / Decline / Negotiate
+                  are secure tokenized links to your backend — a tracked quote is always created.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* PDF attachment selector */}
           <div className="form-field">

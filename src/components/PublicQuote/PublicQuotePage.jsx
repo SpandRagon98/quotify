@@ -43,10 +43,19 @@ export default function PublicQuotePage({ token }) {
   const [submitting, setSubmitting] = useState("");
   const [finalStatus, setFinalStatus] = useState(""); // set after responding
 
+  // Intent passed from the email CTA buttons (?intent=approved|declined|negotiate).
+  // We PRE-SELECT it but still require an explicit confirm click, so mail-client
+  // link prefetching can never trigger a false response.
+  const intent = (() => {
+    const v = new URLSearchParams(window.location.search).get("intent");
+    return ["approved", "declined", "negotiate"].includes(v) ? v : "";
+  })();
+
   // A clean, branded default look for external recipients.
   useEffect(() => {
     document.documentElement.setAttribute("data-accent", "indigo");
-  }, []);
+    if (intent === "negotiate") setShowNote(true);
+  }, [intent]);
 
   useEffect(() => {
     let cancelled = false;
@@ -159,7 +168,9 @@ export default function PublicQuotePage({ token }) {
                 </div>
               ) : (
                 <>
-                  <h3 className="pub-quote-prompt">How would you like to respond?</h3>
+                  <h3 className="pub-quote-prompt">
+                    {intent ? "Please confirm your response" : "How would you like to respond?"}
+                  </h3>
                   {showNote && (
                     <textarea
                       className="control pub-quote-note"
@@ -173,7 +184,7 @@ export default function PublicQuotePage({ token }) {
                     {RESPONSES.map(({ key, label, icon: Icon, cls }) => (
                       <button
                         key={key}
-                        className={`pub-btn ${cls}`}
+                        className={`pub-btn ${cls} ${intent === key ? "pub-btn-suggested" : ""}`}
                         disabled={Boolean(submitting)}
                         onClick={() => {
                           if (key === "negotiate" && !showNote) {

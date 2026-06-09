@@ -41,9 +41,17 @@ serve(async (req) => {
       return json({ error: "RESEND_API_KEY is not configured on the server." }, 500);
     }
 
-    const { to, subject, html, text, from } = await req.json();
+    const { to, subject, html, text, from, attachments } = await req.json();
     if (!to || !subject || (!html && !text)) {
       return json({ error: "Missing required fields: to, subject, and html or text." }, 400);
+    }
+
+    const payload: Record<string, unknown> = { from: from || RESEND_FROM, to, subject, html, text };
+    // attachments: [{ filename, content }] where content is base64 (no data: prefix)
+    if (Array.isArray(attachments) && attachments.length > 0) {
+      payload.attachments = attachments
+        .filter((a) => a && a.filename && a.content)
+        .map((a) => ({ filename: a.filename, content: a.content }));
     }
 
     const res = await fetch("https://api.resend.com/emails", {
@@ -52,7 +60,7 @@ serve(async (req) => {
         Authorization: `Bearer ${RESEND_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from: from || RESEND_FROM, to, subject, html, text }),
+      body: JSON.stringify(payload),
     });
 
     const data = await res.json();

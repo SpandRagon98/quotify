@@ -965,6 +965,11 @@ textarea.control { resize: vertical; }
 .pub-btn-negotiate { background: var(--surface-2); }
 .pub-btn-decline { background: var(--surface-2); }
 .pub-btn-decline:hover { border-color: #e8497b; color: #e8497b; }
+.pub-btn-suggested { box-shadow: 0 0 0 3px var(--brand-soft); transform: translateY(-1px); }
+.pub-btn-suggested::after {
+  content: "Confirm"; margin-left: 6px; font-size: 11px; font-weight: 700;
+  opacity: 0.85; letter-spacing: 0.02em;
+}
 .pub-quote-err { margin-top: 12px; }
 .pub-quote-done { display: flex; align-items: center; gap: 14px; }
 .pub-quote-done strong { display: block; font-size: 16px; }

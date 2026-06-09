@@ -65,6 +65,23 @@ export const GOOGLE = {
   ENABLED: true,
 };
 
+/**
+ * Email delivery (Phase 2).
+ *
+ * PROVIDER picks the default sending path:
+ *   - "appsscript" (default): the existing Google Apps Script / Gmail path.
+ *   - "resend": branded transactional email from your own domain via the
+ *     `send-quote-email` Supabase Edge Function, with tokenized Approve/Decline/
+ *     Negotiate CTAs to our own backend. See PHASE2_SETUP.md.
+ *
+ * Set VITE_EMAIL_PROVIDER=resend (in .env.production / Cloudflare) once the Edge
+ * Function + Resend domain are configured. Users can still switch per-send in the
+ * Email composer when the cloud backend is active.
+ */
+export const EMAIL = {
+  PROVIDER: import.meta.env.VITE_EMAIL_PROVIDER === "resend" ? "resend" : "appsscript",
+};
+
 /** Metadata columns prepended to every preset sheet tab. */
 export const METADATA_COLUMNS = [
   "Quotation ID",

@@ -21,13 +21,14 @@ export const resendAvailable = () => isSupabaseConfigured;
  * @param {string} [p.html]
  * @param {string} [p.text]
  * @param {string} [p.from] - overrides RESEND_FROM (must be a verified sender)
+ * @param {Array<{filename:string, content:string}>} [p.attachments] - base64 content
  */
-export async function sendViaResend({ to, subject, html, text, from }) {
+export async function sendViaResend({ to, subject, html, text, from, attachments }) {
   if (!isSupabaseConfigured) {
     throw new Error("Cloud backend not configured — cannot reach the email function.");
   }
   const { data, error } = await supabase.functions.invoke("send-quote-email", {
-    body: { to, subject, html, text, from },
+    body: { to, subject, html, text, from, attachments },
   });
   if (error) throw new Error(error.message || "Email function call failed.");
   if (data?.error) throw new Error(data.error);

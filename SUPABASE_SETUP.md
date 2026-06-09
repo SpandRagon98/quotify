@@ -72,7 +72,7 @@ Cloudflare Pages is free, allows commercial use, and has unlimited bandwidth.
 5. **Deploy.** You'll get a `*.pages.dev` URL.
 6. Back in Supabase → **Authentication → URL Configuration** → add that URL (and
    later your custom domain) to **Site URL / Redirect URLs**.
-7. SPA routing is already handled by `public/_redirects`.
+7. SPA routing is handled natively by Cloudflare Workers Assets — no `_redirects` file needed.
 
 (Netlify works the same way: build `npm run build`, publish `dist`, add the two env vars.)
 

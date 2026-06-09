@@ -16,6 +16,8 @@ dist-ssr
 .env
 .env.*
 !.env.example
+# .env.production contains only the public Supabase anon key (safe to commit)
+!.env.production
 
 # Editor / local tooling
 .claude

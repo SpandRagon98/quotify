@@ -5,8 +5,12 @@ import { useNotifications } from "../../notifications/useNotifications";
 
 const STATUS_CLASS = {
   Approved: "notif-status-approved",
+  Accepted: "notif-status-approved",
   Declined: "notif-status-declined",
   Negotiated: "notif-status-negotiated",
+  "Changes requested": "notif-status-negotiated",
+  Viewed: "notif-status-viewed",
+  Expired: "notif-status-expired",
 };
 
 function relativeTime(iso) {

@@ -55,3 +55,9 @@ export async function elementToPdfBlobUrl(el) {
   const pdf = canvasToPdf(await renderCanvas(el));
   return URL.createObjectURL(pdf.output("blob"));
 }
+
+/** Generate a PDF from `el` and trigger a browser download. */
+export async function downloadElementPdf(el, filename = "quotation.pdf") {
+  const pdf = canvasToPdf(await renderCanvas(el));
+  pdf.save(filename);
+}

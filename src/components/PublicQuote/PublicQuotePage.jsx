@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
   XCircle,
@@ -6,10 +6,14 @@ import {
   Loader2,
   AlertCircle,
   ShieldCheck,
+  Download,
+  Clock,
+  History,
 } from "lucide-react";
 import Logo from "../common/Logo";
 import DocumentPreview from "../common/DocumentPreview";
 import { APP } from "../../config/appConfig";
+import { downloadElementPdf } from "../../utils/pdf";
 import {
   getTrackedQuote,
   recordQuoteView,
@@ -18,20 +22,30 @@ import {
 } from "../../lib/quoteTracking";
 
 const RESPONSES = [
-  { key: "approved", label: "Approve", icon: CheckCircle2, cls: "pub-btn-approve" },
-  { key: "negotiate", label: "Negotiate", icon: MessageSquare, cls: "pub-btn-negotiate" },
+  { key: "approved", label: "Accept", icon: CheckCircle2, cls: "pub-btn-approve" },
+  { key: "negotiate", label: "Request changes", icon: MessageSquare, cls: "pub-btn-negotiate" },
   { key: "declined", label: "Decline", icon: XCircle, cls: "pub-btn-decline" },
 ];
 
 const STATUS_LABEL = {
-  approved: "Approved",
+  approved: "Accepted",
   declined: "Declined",
-  negotiate: "Negotiation requested",
+  negotiate: "Changes requested",
 };
 
+function fmtDate(iso) {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  } catch {
+    return "";
+  }
+}
+
 /**
- * Standalone, no-login page a recipient opens at /q/<token>. It renders the
- * branded quotation document, logs a view, and lets the recipient respond.
+ * Standalone, no-login page a recipient opens at /q/<token>. Renders the branded
+ * quotation, logs a view, and handles the full lifecycle: Download PDF, expiry,
+ * and Accept / Request changes / Decline with a typed-name acceptance signature.
  * Rendered directly from main.jsx — it never mounts the authenticated app.
  */
 export default function PublicQuotePage({ token }) {
@@ -39,22 +53,26 @@ export default function PublicQuotePage({ token }) {
   const [quote, setQuote] = useState(null);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
+  const [signName, setSignName] = useState("");
   const [showNote, setShowNote] = useState(false);
+  const [showSig, setShowSig] = useState(false);
   const [submitting, setSubmitting] = useState("");
-  const [finalStatus, setFinalStatus] = useState(""); // set after responding
+  const [finalStatus, setFinalStatus] = useState("");
+  const [downloading, setDownloading] = useState(false);
+  const pdfStageRef = useRef(null);
 
-  // Intent passed from the email CTA buttons (?intent=approved|declined|negotiate).
-  // We PRE-SELECT it but still require an explicit confirm click, so mail-client
-  // link prefetching can never trigger a false response.
+  // Intent from the email CTA (?intent=approved|declined|negotiate). We PRE-SELECT
+  // it but always require an explicit confirm, so mail-client link prefetching
+  // can never trigger a false response.
   const intent = (() => {
     const v = new URLSearchParams(window.location.search).get("intent");
     return ["approved", "declined", "negotiate"].includes(v) ? v : "";
   })();
 
-  // A clean, branded default look for external recipients.
   useEffect(() => {
     document.documentElement.setAttribute("data-accent", "indigo");
     if (intent === "negotiate") setShowNote(true);
+    if (intent === "approved") setShowSig(true);
   }, [intent]);
 
   useEffect(() => {
@@ -86,10 +104,19 @@ export default function PublicQuotePage({ token }) {
   }, [token]);
 
   const handleRespond = async (key) => {
+    if (key === "approved" && !signName.trim()) {
+      setError("Please type your full name to accept this quotation.");
+      return;
+    }
     setSubmitting(key);
     setError("");
     try {
-      const res = await respondToQuote(token, key, key === "negotiate" ? note : "");
+      const res = await respondToQuote(
+        token,
+        key,
+        key === "negotiate" ? note : "",
+        key === "approved" ? signName : ""
+      );
       setFinalStatus(res?.status || key);
     } catch (err) {
       setError(err.message || "Could not record your response.");
@@ -98,11 +125,45 @@ export default function PublicQuotePage({ token }) {
     }
   };
 
+  const handleClick = (key) => {
+    setError("");
+    if (key === "approved" && !showSig) return setShowSig(true);
+    if (key === "negotiate" && !showNote) return setShowNote(true);
+    handleRespond(key);
+  };
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const name = `${snap.presetName || quote?.preset_name || "quotation"}-${
+        snap.quotationId || quote?.quotation_id || "doc"
+      }.pdf`;
+      await downloadElementPdf(pdfStageRef.current, name);
+    } catch (err) {
+      setError(err.message || "Could not generate the PDF.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const snap = quote?.snapshot || {};
+  const expired = Boolean(quote?.is_expired) || quote?.status === "expired";
   const alreadyResponded =
     finalStatus ||
     (quote && ["approved", "declined", "negotiate"].includes(quote.status) ? quote.status : "");
+  const version = quote?.version || 1;
 
-  const snap = quote?.snapshot || {};
+  const docProps = {
+    preset: snap.preset || { name: snap.presetName || "Quotation", fields: [] },
+    values: snap.values || {},
+    quotationId: snap.quotationId || quote?.quotation_id || "",
+    mode: "data",
+    logo: snap.logo || "",
+    banner: snap.banner || "",
+    description: snap.description || "",
+    hiddenFields: snap.hiddenFields || [],
+    extraContent: snap.extraContent || [],
+  };
 
   return (
     <div className="pub-quote">
@@ -141,18 +202,25 @@ export default function PublicQuotePage({ token }) {
 
         {state === "ready" && quote && (
           <>
+            {/* Lifecycle banner: version / validity */}
+            <div className="pub-quote-meta">
+              {version > 1 && (
+                <span className="pub-quote-chip pub-chip-rev">
+                  <History size={13} /> Revised · v{version}
+                </span>
+              )}
+              {quote.expires_at && !alreadyResponded && (
+                <span className={`pub-quote-chip ${expired ? "pub-chip-expired" : "pub-chip-valid"}`}>
+                  <Clock size={13} /> {expired ? "Expired" : "Valid until"} {fmtDate(quote.expires_at)}
+                </span>
+              )}
+              <button className="pub-quote-chip pub-chip-dl" onClick={handleDownload} disabled={downloading}>
+                {downloading ? <Loader2 size={13} className="spin" /> : <Download size={13} />} Download PDF
+              </button>
+            </div>
+
             <div className="pub-quote-doc">
-              <DocumentPreview
-                preset={snap.preset || { name: snap.presetName || "Quotation", fields: [] }}
-                values={snap.values || {}}
-                quotationId={snap.quotationId || quote.quotation_id || ""}
-                mode="data"
-                logo={snap.logo || ""}
-                banner={snap.banner || ""}
-                description={snap.description || ""}
-                hiddenFields={snap.hiddenFields || []}
-                extraContent={snap.extraContent || []}
-              />
+              <DocumentPreview {...docProps} />
             </div>
 
             <div className="pub-quote-card pub-quote-actions">
@@ -163,7 +231,20 @@ export default function PublicQuotePage({ token }) {
                   {alreadyResponded === "negotiate" && <MessageSquare size={22} />}
                   <div>
                     <strong>{STATUS_LABEL[alreadyResponded]}</strong>
-                    <p>Thank you — your response has been sent to the sender.</p>
+                    <p>
+                      {quote.signed_name
+                        ? `Signed by ${quote.signed_name}. `
+                        : ""}
+                      Thank you — your response has been sent to the sender.
+                    </p>
+                  </div>
+                </div>
+              ) : expired ? (
+                <div className="pub-quote-done pub-done-declined">
+                  <Clock size={22} />
+                  <div>
+                    <strong>This quotation has expired</strong>
+                    <p>It was valid until {fmtDate(quote.expires_at)}. Please contact the sender for an updated quote.</p>
                   </div>
                 </div>
               ) : (
@@ -171,28 +252,35 @@ export default function PublicQuotePage({ token }) {
                   <h3 className="pub-quote-prompt">
                     {intent ? "Please confirm your response" : "How would you like to respond?"}
                   </h3>
+
+                  {showSig && (
+                    <label className="pub-quote-field">
+                      <span>Type your full name to accept (acts as your signature)</span>
+                      <input
+                        className="control"
+                        value={signName}
+                        placeholder="e.g. Jane Smith"
+                        onChange={(e) => setSignName(e.target.value)}
+                      />
+                    </label>
+                  )}
                   {showNote && (
                     <textarea
                       className="control pub-quote-note"
                       rows={3}
                       value={note}
-                      placeholder="Optional message for the sender (e.g. what you'd like to negotiate)…"
+                      placeholder="What would you like to change? (optional message for the sender)…"
                       onChange={(e) => setNote(e.target.value)}
                     />
                   )}
+
                   <div className="pub-quote-btns">
                     {RESPONSES.map(({ key, label, icon: Icon, cls }) => (
                       <button
                         key={key}
                         className={`pub-btn ${cls} ${intent === key ? "pub-btn-suggested" : ""}`}
                         disabled={Boolean(submitting)}
-                        onClick={() => {
-                          if (key === "negotiate" && !showNote) {
-                            setShowNote(true);
-                            return;
-                          }
-                          handleRespond(key);
-                        }}
+                        onClick={() => handleClick(key)}
                       >
                         {submitting === key ? <Loader2 size={17} className="spin" /> : <Icon size={17} />}
                         {label}
@@ -214,6 +302,13 @@ export default function PublicQuotePage({ token }) {
       <footer className="pub-quote-foot">
         Powered by <strong>{APP.name}</strong>
       </footer>
+
+      {/* Off-screen A4 stage used to capture the Download PDF */}
+      {state === "ready" && quote && (
+        <div className="pdf-stage" ref={pdfStageRef} aria-hidden="true">
+          <DocumentPreview {...docProps} />
+        </div>
+      )}
     </div>
   );
 }

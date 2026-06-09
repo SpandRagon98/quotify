@@ -895,6 +895,9 @@ textarea.control { resize: vertical; }
 .track-toggle input { width: 16px; height: 16px; accent-color: var(--brand); cursor: pointer; }
 .track-toggle-label { display: inline-flex; align-items: center; gap: 6px; margin: 0; cursor: pointer; }
 .track-hint { margin: 2px 0 0; }
+.track-validity { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.track-validity .form-label { margin: 0; }
+.track-days { width: 72px; text-align: center; }
 .track-link-row {
   display: flex; align-items: center; gap: 8px; margin-top: 6px; padding: 8px 10px;
   border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2);
@@ -937,6 +940,21 @@ textarea.control { resize: vertical; }
   display: flex; align-items: center; justify-content: center; gap: 10px;
   padding: 60px 0; color: var(--text-soft); font-size: 15px;
 }
+.pub-quote-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pub-quote-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+  border-radius: 999px; font-size: 12.5px; font-weight: 600;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-soft);
+}
+.pub-chip-rev { color: var(--brand); border-color: var(--brand); background: var(--brand-soft); }
+.pub-chip-valid { color: #0f9d6e; border-color: color-mix(in srgb, #0f9d6e 45%, var(--border)); }
+.pub-chip-expired { color: #e8497b; border-color: color-mix(in srgb, #e8497b 45%, var(--border)); }
+.pub-chip-dl { cursor: pointer; margin-left: auto; transition: border-color 0.15s ease, color 0.15s ease; }
+.pub-chip-dl:hover { color: var(--brand); border-color: var(--brand); }
+.pub-chip-dl:disabled { opacity: 0.6; cursor: not-allowed; }
+.pub-quote-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; font-size: 13px; color: var(--text-soft); }
+.pub-quote-field .control { width: 100%; }
+
 .pub-quote-doc {
   border-radius: 16px; overflow: hidden; box-shadow: var(--shadow-lg);
   border: 1px solid var(--border); background: var(--surface);
@@ -1553,6 +1571,12 @@ textarea.control { resize: vertical; }
 .notif-pill.notif-status-approved { background: var(--success-soft, rgba(15,157,110,0.14)); color: var(--success); }
 .notif-pill.notif-status-declined { background: var(--danger-soft); color: var(--danger); }
 .notif-pill.notif-status-negotiated { background: rgba(224,146,31,0.16); color: #b9760f; }
+.notif-status-viewed { color: #2f7df6; }
+.notif-dot.notif-status-viewed { background: #2f7df6; }
+.notif-pill.notif-status-viewed { background: rgba(47,125,246,0.14); color: #2f7df6; }
+.notif-status-expired { color: var(--text-soft); }
+.notif-dot.notif-status-expired { background: var(--text-soft); }
+.notif-pill.notif-status-expired { background: var(--surface-2); color: var(--text-soft); }
 
 .mobile-topbar-actions { display: inline-flex; align-items: center; gap: 8px; }
 

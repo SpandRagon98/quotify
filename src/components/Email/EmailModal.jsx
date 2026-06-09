@@ -56,6 +56,7 @@ export default function EmailModal({
   const [trackOn, setTrackOn] = useState(canTrack);
   const [trackLink, setTrackLink] = useState("");
   const [tracking, setTracking] = useState(null); // latest tracked quote status
+  const [validDays, setValidDays] = useState(30); // "valid until" expiry (0 = none)
 
   // Email delivery path (Phase 2). Resend is selectable only in cloud mode.
   const [provider, setProvider] = useState(
@@ -104,7 +105,7 @@ export default function EmailModal({
   });
 
   const trackStatusLabel = (s) =>
-    ({ sent: "Sent", viewed: "Viewed", approved: "Approved", declined: "Declined", negotiate: "Negotiating" }[s] || s);
+    ({ sent: "Sent", viewed: "Viewed", approved: "Accepted", declined: "Declined", negotiate: "Changes requested", expired: "Expired" }[s] || s);
 
   const insertToken = (token) => {
     const target = lastFocused.current === "subject" ? "subject" : "body";
@@ -142,11 +143,14 @@ export default function EmailModal({
       let trackUrl = "";
       if (wantTrack && canTrack) {
         setStatus({ state: "sending", message: "Creating tracking link…" });
+        const days = Number(validDays) || 0;
+        const expiresAt = days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : null;
         const created = await createTrackedQuote({
           quotationId: quotationId || rowDoc.quotationId,
           presetName: preset.name,
           recipientEmail: recipient,
           snapshot: buildSnapshot(),
+          expiresAt,
         });
         trackUrl = created.url;
         setTrackLink(trackUrl);
@@ -395,8 +399,23 @@ export default function EmailModal({
               </label>
               <p className="form-hint track-hint">
                 Adds a secure link the recipient opens to view this quotation and
-                Approve / Decline / Negotiate. You'll see views and their response here.
+                Accept / Decline / Request changes. You'll see views and their response here.
               </p>
+
+              {(trackOn || provider === "resend") && (
+                <div className="track-validity">
+                  <span className="form-label">Valid for</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="365"
+                    className="control track-days"
+                    value={validDays}
+                    onChange={(e) => setValidDays(e.target.value)}
+                  />
+                  <span className="form-hint">days {Number(validDays) > 0 ? "" : "(no expiry)"}</span>
+                </div>
+              )}
 
               {trackLink && (
                 <div className="track-link-row">
@@ -419,7 +438,9 @@ export default function EmailModal({
                   <Eye size={14} />
                   <span>
                     <strong>{trackStatusLabel(tracking.status)}</strong>
+                    {tracking.version > 1 && ` · v${tracking.version}`}
                     {tracking.view_count > 0 && ` · ${tracking.view_count} view${tracking.view_count === 1 ? "" : "s"}`}
+                    {tracking.signed_name && ` · signed: ${tracking.signed_name}`}
                     {tracking.response_note && ` · "${tracking.response_note}"`}
                   </span>
                 </div>

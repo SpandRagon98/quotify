@@ -33,6 +33,7 @@ const NotificationsContext = createContext({
   items: [],
   unreadCount: 0,
   ingest: () => {},
+  addNotification: () => {},
   markAllRead: () => {},
   clearAll: () => {},
 });
@@ -97,6 +98,22 @@ export function useNotificationsStore() {
     }
   }, []);
 
+  /** Push a notification directly (used by the live DB-status watcher). */
+  const addNotification = useCallback((item) => {
+    setItems((prev) => {
+      const entry = {
+        id: item.id || `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        read: false,
+        time: item.time || new Date().toISOString(),
+        ...item,
+      };
+      if (prev.some((p) => p.id === entry.id)) return prev; // de-dupe across polls
+      const next = [entry, ...prev].slice(0, 60);
+      save(STORAGE_KEYS.notifications, next);
+      return next;
+    });
+  }, []);
+
   const markAllRead = useCallback(() => {
     setItems((prev) => {
       const next = prev.map((i) => ({ ...i, read: true }));
@@ -112,7 +129,7 @@ export function useNotificationsStore() {
 
   const unreadCount = items.reduce((n, i) => n + (i.read ? 0 : 1), 0);
 
-  return { items, unreadCount, ingest, markAllRead, clearAll };
+  return { items, unreadCount, ingest, addNotification, markAllRead, clearAll };
 }
 
 export { NotificationsContext };

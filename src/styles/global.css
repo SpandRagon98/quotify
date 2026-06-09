@@ -1032,6 +1032,11 @@ textarea.control { resize: vertical; }
   color: var(--danger); background: var(--danger-soft);
   border-radius: var(--radius-sm); padding: 9px 12px;
 }
+.auth-notice {
+  display: flex; align-items: center; gap: 8px; font-size: 13px;
+  color: var(--success); background: var(--success-soft);
+  border-radius: var(--radius-sm); padding: 9px 12px;
+}
 .auth-switch { font-size: 13px; color: var(--text-soft); text-align: center; margin: 6px 0 0; }
 .auth-link { background: none; border: none; color: var(--brand); font-weight: 700; cursor: pointer; padding: 0; font-size: 13px; }
 .auth-link:hover { text-decoration: underline; }

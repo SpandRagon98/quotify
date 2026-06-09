@@ -6,8 +6,17 @@
  * Backward compatible: older entries were a logo data-URL string or {logo,description}.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { STORAGE_KEYS } from "../config/appConfig";
+import {
+  startCloud,
+  cloudEnabled,
+  onCloudAuth,
+  loadCloudState,
+  saveCloudState,
+} from "../lib/cloudStore";
+
+const CLOUD_KEY = "company_profiles";
 
 function normalizeEntry(entry) {
   if (typeof entry === "string") {
@@ -45,13 +54,47 @@ export function useCompanyProfile(presetId) {
   const [store, setStore] = useState(loadAll);
   const profile = normalizeEntry(store[presetId]);
 
+  const storeRef = useRef(store);
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    storeRef.current = store;
+  }, [store]);
+
   const persist = (next) => {
     try {
       localStorage.setItem(STORAGE_KEYS.companyLogos, JSON.stringify(next));
     } catch {
       // ignore
     }
+    if (cloudEnabled() && hydratedRef.current) saveCloudState(CLOUD_KEY, next);
   };
+
+  // Hydrate this org's company/document config from the cloud once signed in.
+  useEffect(() => {
+    if (!cloudEnabled()) return undefined;
+    startCloud();
+    const off = onCloudAuth(async ({ orgId }) => {
+      if (!orgId) {
+        hydratedRef.current = false;
+        return;
+      }
+      const cloud = await loadCloudState(CLOUD_KEY);
+      if (cloud === undefined) return;
+      if (cloud && typeof cloud === "object") {
+        hydratedRef.current = true;
+        setStore(cloud);
+        try {
+          localStorage.setItem(STORAGE_KEYS.companyLogos, JSON.stringify(cloud));
+        } catch {
+          // ignore
+        }
+      } else {
+        await saveCloudState(CLOUD_KEY, storeRef.current);
+        hydratedRef.current = true;
+      }
+    });
+    return off;
+  }, []);
 
   const patch = useCallback(
     (changes) => {

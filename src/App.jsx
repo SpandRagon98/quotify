@@ -50,7 +50,8 @@ export default function App() {
   const handleNav = (key) => go(key);
 
   // --- Splash, then auth gates (all hooks above run unconditionally) ---
-  if (booting) return <LoadingScreen />;
+  // Wait for the (cloud) session to restore before deciding which screen to show.
+  if (booting || !auth.ready) return <LoadingScreen />;
   if (!auth.session) return <AuthScreen onLogin={auth.login} onSignup={auth.signup} />;
   if (!auth.role) return <NoAccessScreen email={auth.session} onLogout={auth.logout} />;
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { LogIn, UserPlus, Mail, Lock, User, AlertCircle } from "lucide-react";
+import { LogIn, UserPlus, Mail, Lock, User, AlertCircle, Loader2, CheckCircle2 } from "lucide-react";
 import { APP } from "../../config/appConfig";
 import Logo from "../common/Logo";
 
@@ -10,12 +10,19 @@ export default function AuthScreen({ onLogin, onSignup }) {
   const [mode, setMode] = useState("login"); // login | signup
   const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const isSignup = mode === "signup";
-  const set = (patch) => { setForm((f) => ({ ...f, ...patch })); if (error) setError(""); };
+  const set = (patch) => {
+    setForm((f) => ({ ...f, ...patch }));
+    if (error) setError("");
+    if (notice) setNotice("");
+  };
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
+    if (busy) return;
     if (!EMAIL_RE.test(form.email.trim())) return setError("Please enter a valid email address.");
     if (!form.password) return setError("Please enter your password.");
 
@@ -23,11 +30,29 @@ export default function AuthScreen({ onLogin, onSignup }) {
       if (!form.name.trim()) return setError("Please enter your name.");
       if (form.password.length < 6) return setError("Password must be at least 6 characters.");
       if (form.password !== form.confirm) return setError("Passwords do not match.");
-      const res = onSignup({ name: form.name.trim(), email: form.email.trim(), password: form.password });
-      if (!res.ok) setError(res.error);
-    } else {
-      const res = onLogin({ email: form.email.trim(), password: form.password });
-      if (!res.ok) setError(res.error);
+    }
+
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      // Works for both sync (local) and async (Supabase) auth implementations.
+      const res = isSignup
+        ? await onSignup({ name: form.name.trim(), email: form.email.trim(), password: form.password })
+        : await onLogin({ email: form.email.trim(), password: form.password });
+
+      if (!res?.ok) {
+        setError(res?.error || "Something went wrong. Please try again.");
+      } else if (res.needsVerification) {
+        setNotice("Account created. Check your email to confirm your address, then log in.");
+        setMode("login");
+        setForm((f) => ({ ...f, password: "", confirm: "" }));
+      }
+      // On success with a session, the app re-renders to the dashboard automatically.
+    } catch (err) {
+      setError(err?.message || "Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -78,9 +103,16 @@ export default function AuthScreen({ onLogin, onSignup }) {
         </AnimatePresence>
 
         {error ? <div className="auth-error"><AlertCircle size={15} /> {error}</div> : null}
+        {notice ? <div className="auth-notice"><CheckCircle2 size={15} /> {notice}</div> : null}
 
-        <button className="btn btn-primary auth-submit" type="submit">
-          {isSignup ? <><UserPlus size={18} /> Sign up</> : <><LogIn size={18} /> Log in</>}
+        <button className="btn btn-primary auth-submit" type="submit" disabled={busy}>
+          {busy ? (
+            <><Loader2 size={18} className="spin" /> Please wait…</>
+          ) : isSignup ? (
+            <><UserPlus size={18} /> Sign up</>
+          ) : (
+            <><LogIn size={18} /> Log in</>
+          )}
         </button>
 
         <p className="auth-switch">

@@ -1,13 +1,25 @@
 /**
- * Preset persistence via localStorage.
- * Encapsulated in a hook so it can later be swapped for an API-backed store
- * without touching the components that consume it.
+ * Preset persistence.
+ *
+ * Local-first: renders instantly from a localStorage cache. When Supabase is
+ * configured AND a user is signed in, presets hydrate from / write through to the
+ * org's cloud row (multi-tenant, isolated by Row-Level Security). With no backend
+ * configured it behaves exactly as before (localStorage only).
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { STORAGE_KEYS } from "../config/appConfig";
 import { buildDefaultPresets } from "../data/defaultPresets";
 import { normalizePreset } from "../utils/googleLinks";
+import {
+  startCloud,
+  cloudEnabled,
+  onCloudAuth,
+  loadCloudState,
+  saveCloudState,
+} from "../lib/cloudStore";
+
+const CLOUD_KEY = "presets";
 
 function loadPresets() {
   try {
@@ -32,15 +44,42 @@ function loadPresets() {
 
 export function usePresets() {
   const [presets, setPresets] = useState(loadPresets);
+  const presetsRef = useRef(presets);
+  const hydratedRef = useRef(false);
 
-  // Persist on every change.
+  // Persist locally on every change; mirror to the cloud once hydrated.
   useEffect(() => {
+    presetsRef.current = presets;
     try {
       localStorage.setItem(STORAGE_KEYS.presets, JSON.stringify(presets));
     } catch (err) {
       console.warn("Could not persist presets:", err);
     }
+    if (cloudEnabled() && hydratedRef.current) saveCloudState(CLOUD_KEY, presets);
   }, [presets]);
+
+  // Hydrate from the cloud when the signed-in org becomes available.
+  useEffect(() => {
+    if (!cloudEnabled()) return undefined;
+    startCloud();
+    const off = onCloudAuth(async ({ orgId }) => {
+      if (!orgId) {
+        hydratedRef.current = false;
+        return;
+      }
+      const cloud = await loadCloudState(CLOUD_KEY);
+      if (cloud === undefined) return; // cloud unavailable → stay local
+      if (Array.isArray(cloud)) {
+        hydratedRef.current = true;
+        setPresets(cloud.map(normalizePreset));
+      } else {
+        // No cloud row yet → migrate the current local presets up (one-time).
+        await saveCloudState(CLOUD_KEY, presetsRef.current);
+        hydratedRef.current = true;
+      }
+    });
+    return off;
+  }, []);
 
   const savePreset = useCallback((preset) => {
     const stamped = { ...preset, updatedAt: new Date().toISOString() };

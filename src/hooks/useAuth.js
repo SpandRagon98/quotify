@@ -1,16 +1,17 @@
 /**
- * Email + password auth, profile, and role management (localStorage-backed).
+ * Authentication + roles — DUAL MODE.
  *
- * Two stores:
- *   - accounts (credentials + profile): email → { email, name, passHash, avatar }
- *   - users (roles):                    email → { email, role, addedAt }
+ *  • Cloud mode (Supabase configured): real email/password auth, sessions,
+ *    password reset & email verification handled by Supabase. Each account owns a
+ *    private organization (created by a DB trigger on signup); all app data is
+ *    isolated per org by Row-Level Security.
  *
- * Access rule: the owner email is always Owner; everyone else needs a role
- * assigned by an Owner/Admin, otherwise they have no access.
+ *  • Local mode (no Supabase env vars): the original localStorage demo auth, so
+ *    the app still builds and runs at $0. ⚠️ NOT secure — for local/dev only.
  *
- * ⚠️ SECURITY: passwords are stored as a lightweight non-cryptographic hash in
- * localStorage — this is a front-end-only demo, NOT real authentication. Migrate
- * to a backend / Firebase Auth before production (see GOOGLE_APPS_SCRIPT_SETUP.md).
+ * `useAuth` is bound once at module load to the right implementation, so hooks are
+ * always called unconditionally (rules-of-hooks safe). Both return the SAME shape
+ * so the rest of the app is unchanged.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -21,10 +22,155 @@ import {
   STORAGE_KEYS,
 } from "../config/appConfig";
 import { ROLES } from "../auth/roles";
+import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 
 const normalize = (email) => String(email || "").trim().toLowerCase();
 
-/** Non-cryptographic hash (djb2). NOT secure — see warning above. */
+/* ============================ CLOUD (Supabase) ============================ */
+
+function useSupabaseAuth() {
+  const [ready, setReady] = useState(false);
+  const [sessionEmail, setSessionEmail] = useState(null);
+  const [profile, setProfile] = useState(null); // { id, email, name, avatar, role, orgId }
+
+  const loadContext = useCallback(async (user) => {
+    if (!user) {
+      setProfile(null);
+      setSessionEmail(null);
+      return;
+    }
+    const email = normalize(user.email);
+    let name = user.user_metadata?.full_name || email;
+    let avatar = "";
+    let orgId = null;
+    let role = ROLES.OWNER;
+    try {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("full_name, avatar_url, default_org_id")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (prof) {
+        name = prof.full_name || name;
+        avatar = prof.avatar_url || "";
+        orgId = prof.default_org_id || null;
+      }
+      if (orgId) {
+        const { data: mem } = await supabase
+          .from("org_members")
+          .select("role")
+          .eq("org_id", orgId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (mem?.role) role = mem.role;
+      }
+    } catch (err) {
+      console.warn("[auth] could not load profile/role:", err?.message || err);
+    }
+    setProfile({ id: user.id, email, name, avatar, role, orgId });
+    setSessionEmail(email);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!active) return;
+      await loadContext(data.session?.user || null);
+      setReady(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      await loadContext(session?.user || null);
+      setReady(true);
+    });
+    return () => {
+      active = false;
+      sub?.subscription?.unsubscribe?.();
+    };
+  }, [loadContext]);
+
+  const login = useCallback(async ({ email, password }) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: normalize(email),
+      password,
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  }, []);
+
+  const signup = useCallback(async ({ name, email, password }) => {
+    const { data, error } = await supabase.auth.signUp({
+      email: normalize(email),
+      password,
+      options: { data: { full_name: (name || "").trim() } },
+    });
+    if (error) return { ok: false, error: error.message };
+    // With email confirmation ON there is no session until the user confirms.
+    if (!data.session) return { ok: true, needsVerification: true };
+    return { ok: true };
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.warn("[auth] sign out:", err?.message || err);
+    }
+    // Privacy: drop this device's cached org data; next sign-in re-hydrates.
+    [STORAGE_KEYS.presets, STORAGE_KEYS.companyLogos, STORAGE_KEYS.emailTemplates].forEach((k) => {
+      try {
+        localStorage.removeItem(k);
+      } catch {
+        // ignore
+      }
+    });
+  }, []);
+
+  const updateProfile = useCallback(async ({ name, avatar }) => {
+    setProfile((p) => (p ? { ...p, name: name ?? p.name, avatar: avatar ?? p.avatar } : p));
+    try {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        await supabase
+          .from("profiles")
+          .update({
+            ...(name !== undefined ? { full_name: name } : {}),
+            ...(avatar !== undefined ? { avatar_url: avatar } : {}),
+          })
+          .eq("id", data.user.id);
+      }
+    } catch (err) {
+      console.warn("[auth] update profile:", err?.message || err);
+    }
+  }, []);
+
+  // Team RBAC (inviting teammates by email + server-enforced roles) is the next
+  // increment; the schema already supports it. For now the owner sees themselves.
+  const userList = profile ? [{ email: profile.email, role: profile.role, owner: true }] : [];
+  const upsertUser = useCallback(() => {}, []);
+  const removeUser = useCallback(() => {}, []);
+
+  const currentUser = profile
+    ? { email: profile.email, role: profile.role, name: profile.name, avatar: profile.avatar }
+    : null;
+
+  return {
+    ready,
+    currentUser,
+    session: sessionEmail,
+    role: profile?.role || null,
+    signup,
+    login,
+    logout,
+    updateProfile,
+    userList,
+    upsertUser,
+    removeUser,
+  };
+}
+
+/* ============================ LOCAL (demo) ============================ */
+/** ⚠️ localStorage-backed demo auth — NOT secure. Used only with no backend. */
+
 function hashPassword(password) {
   let h = 5381;
   const s = String(password || "");
@@ -45,13 +191,6 @@ function loadJson(key, fallback) {
   return fallback;
 }
 
-/**
- * Load accounts and, exactly once per seed version, seed/reset the owner account
- * so the owner can always log in with the known password. This fixes the
- * "signup says email exists but login says incorrect password" case for the
- * owner (a stale/broken hash) while preserving any existing name/avatar.
- * Non-owner accounts are never touched.
- */
 function loadAccountsWithOwnerSeed() {
   const accounts = loadJson(STORAGE_KEYS.accounts, {});
   let seeded = false;
@@ -94,7 +233,7 @@ function resolveRole(email, users) {
   return users[key]?.role || null;
 }
 
-export function useAuth() {
+function useLocalAuth() {
   const [accounts, setAccounts] = useState(loadAccountsWithOwnerSeed);
   const [users, setUsers] = useState(() => loadJson(STORAGE_KEYS.users, {}));
   const [session, setSession] = useState(loadSession);
@@ -166,7 +305,6 @@ export function useAuth() {
     });
   }, [session]);
 
-  // --- Role management (Users tab) ---
   const upsertUser = useCallback((email, userRole) => {
     const key = normalize(email);
     if (!key || key === normalize(OWNER_EMAIL)) return;
@@ -193,8 +331,13 @@ export function useAuth() {
   ];
 
   return {
+    ready: true,
     currentUser, session, role,
     signup, login, logout, updateProfile,
     userList, upsertUser, removeUser,
   };
 }
+
+/* ============================ Selector ============================ */
+/** Bound once at module load — components always call the same hook. */
+export const useAuth = isSupabaseConfigured ? useSupabaseAuth : useLocalAuth;

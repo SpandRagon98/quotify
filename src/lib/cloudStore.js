@@ -46,8 +46,14 @@ async function resolveOrgId(userId) {
 }
 
 async function applyUser(user) {
-  activeUserId = user?.id || null;
-  activeOrgId = activeUserId ? await resolveOrgId(activeUserId) : null;
+  const nextUserId = user?.id || null;
+  const nextOrgId = nextUserId ? await resolveOrgId(nextUserId) : null;
+  // Supabase fires auth events on every token refresh (~50 min). Only notify
+  // subscribers on a REAL identity change — otherwise every store re-hydrates
+  // from the cloud mid-session and could clobber in-flight edits.
+  if (nextUserId === activeUserId && nextOrgId === activeOrgId) return;
+  activeUserId = nextUserId;
+  activeOrgId = nextOrgId;
   listeners.forEach((cb) => cb({ userId: activeUserId, orgId: activeOrgId }));
 }
 

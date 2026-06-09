@@ -115,8 +115,18 @@ function useSupabaseAuth() {
     } catch (err) {
       console.warn("[auth] sign out:", err?.message || err);
     }
-    // Privacy: drop this device's cached org data; next sign-in re-hydrates.
-    [STORAGE_KEYS.presets, STORAGE_KEYS.companyLogos, STORAGE_KEYS.emailTemplates].forEach((k) => {
+    // Privacy: drop ALL of this device's cached org/user data so the next
+    // account on this browser starts clean (next sign-in re-hydrates from the
+    // cloud). Missing any key here would leak data — or merge it into the next
+    // user's workspace via the local→cloud migration.
+    [
+      STORAGE_KEYS.presets,
+      STORAGE_KEYS.companyLogos,
+      STORAGE_KEYS.emailTemplates,
+      STORAGE_KEYS.docRegistry,
+      STORAGE_KEYS.notifications,
+      STORAGE_KEYS.notifSeen,
+    ].forEach((k) => {
       try {
         localStorage.removeItem(k);
       } catch {

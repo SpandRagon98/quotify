@@ -1,5 +1,8 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import StatusBadge from "./StatusBadge";
+
+/** Rows rendered initially / added per "Show more" click. Keeps huge sheets smooth. */
+const ROW_CHUNK = 150;
 
 /**
  * Premium read-only data table with per-column filter inputs.
@@ -23,6 +26,16 @@ function DataTable({
 }) {
   const hasActions = rowActions.length > 0;
   const isStatus = (h) => statusColumns.includes(h);
+
+  // Incremental rendering: large datasets paint the first chunk instantly and
+  // grow on demand. Reset whenever the row set changes (search/filter/reload).
+  const [limit, setLimit] = useState(ROW_CHUNK);
+  const [prevRows, setPrevRows] = useState(rows);
+  if (prevRows !== rows) {
+    setPrevRows(rows);
+    setLimit(ROW_CHUNK);
+  }
+  const shownRows = rows.length > limit ? rows.slice(0, limit) : rows;
 
   return (
     <div className="table-wrap">
@@ -53,7 +66,7 @@ function DataTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, ri) => (
+          {shownRows.map((row, ri) => (
             <tr key={ri}>
               {hasActions && (
                 <td className="td-action">
@@ -94,6 +107,16 @@ function DataTable({
           ))}
         </tbody>
       </table>
+      {rows.length > shownRows.length && (
+        <div className="table-more">
+          <span>
+            Showing {shownRows.length} of {rows.length} records
+          </span>
+          <button className="btn btn-soft btn-xs" onClick={() => setLimit((v) => v + ROW_CHUNK * 2)}>
+            Show more
+          </button>
+        </div>
+      )}
     </div>
   );
 }

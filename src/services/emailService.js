@@ -45,6 +45,8 @@ export async function sendQuotationEmail({
   attachmentPdfBase64,
   attachmentName,
   attachTemplate,
+  plainMode,
+  quoteUrl,
 }) {
   if (!to) {
     throw new Error("No email address found in this row — add/fill an email field.");
@@ -68,6 +70,11 @@ export async function sendQuotationEmail({
       attachmentPdfBase64: attachmentPdfBase64 || "",
       attachmentName: attachmentName || "",
       attachTemplate: attachTemplate || null,
+      // Clean mode: the (updated) Apps Script sends only the message + secure
+      // document link — no Approve/Decline/Negotiate boxes. Older deployments
+      // ignore these fields, so nothing breaks before the script is re-pasted.
+      plainMode: Boolean(plainMode),
+      quoteUrl: quoteUrl || "",
     });
     assertAction(result, "sendEmail");
     return result;

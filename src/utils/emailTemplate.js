@@ -44,10 +44,10 @@ export function defaultEmailTemplate(preset) {
     subject: `Your quotation from Qyrova — {{Quotation ID}}`,
     body:
       `Hello,\n\n` +
-      `Thank you for your interest. Please find your ${preset?.name || "quotation"} ` +
-      `details below.\n\n` +
+      `Thank you for your interest. Your ${preset?.name || "quotation"} is ready.\n\n` +
       `Quotation ID: {{Quotation ID}}\n\n` +
-      `Use the Approve / Decline / Negotiate buttons below to respond.\n\n` +
+      `You can view, download, and respond to the quotation using the secure ` +
+      `document link in this email.\n\n` +
       `Best regards,\nThe Qyrova Team`,
   };
 }

@@ -6,6 +6,8 @@ import StatusBadge from "./StatusBadge";
  *
  * `rowActions` = array of { label, icon, title, variant?, onClick(row) } rendered
  * in an Actions column. `statusColumns` headers render as coloured status badges.
+ * `leadingColumns` = array of { header, render(row) } custom cells rendered
+ * before the data columns (no filter input) — e.g. a document-status badge.
  *
  * Memoized: with stable callbacks/actions from the parent it skips re-rendering
  * when unrelated state (status banners, etc.) changes.
@@ -17,6 +19,7 @@ function DataTable({
   onFilterChange,
   rowActions = [],
   statusColumns = [],
+  leadingColumns = [],
 }) {
   const hasActions = rowActions.length > 0;
   const isStatus = (h) => statusColumns.includes(h);
@@ -31,6 +34,11 @@ function DataTable({
                 <div className="th-label">Actions</div>
               </th>
             )}
+            {leadingColumns.map((col) => (
+              <th key={`lead-${col.header}`} className="th-lead">
+                <div className="th-label">{col.header}</div>
+              </th>
+            ))}
             {headers.map((h) => (
               <th key={h}>
                 <div className="th-label">{h}</div>
@@ -66,6 +74,11 @@ function DataTable({
                   </div>
                 </td>
               )}
+              {leadingColumns.map((col) => (
+                <td key={`lead-${col.header}`} className="td-lead">
+                  {col.render(row)}
+                </td>
+              ))}
               {headers.map((h, ci) =>
                 isStatus(h) ? (
                   <td key={ci} className="td-status">

@@ -118,8 +118,11 @@ Values come straight from the entered form — **the Doc never reads the Sheet**
 
 ### Send a quotation email (`action: "sendEmail"`)
 The frontend sends the recipient + the placeholder-substituted subject/body.
-The script wraps the body in branded Qyrova HTML and appends the
-**Approve / Decline / Negotiate** buttons before sending via Gmail.
+The script wraps the body in branded Qyrova HTML. With **`plainMode: true`**
+(Qyrova's default) the email is clean and professional: just the message and a
+single secure **View Quotation** button (`quoteUrl`) — viewing, downloading,
+signing, and approving all happen on that page. Without `plainMode` the legacy
+Approve / Decline / Negotiate buttons are appended instead.
 ```json
 {
   "action": "sendEmail",
@@ -129,11 +132,16 @@ The script wraps the body in branded Qyrova HTML and appends the
   "quotationId": "QTF-LXY12-AB3C",
   "presetName": "Standard Quotation",
   "spreadsheetId": "<sheet id>",
-  "sheetTabName": "Standard Quotation"
+  "sheetTabName": "Standard Quotation",
+  "plainMode": true,
+  "quoteUrl": "https://your-app.workers.dev/q/<token>"
 }
 ```
-`spreadsheetId` + `sheetTabName` let the email's Approve/Decline/Negotiate buttons
-link back to this Web App and update the row's status.
+> ⚠️ After updating: paste the new script over the old one and **deploy a new
+> version**, or sent emails will keep showing the legacy buttons.
+
+In legacy mode, `spreadsheetId` + `sheetTabName` let the Approve/Decline/Negotiate
+buttons link back to this Web App and update the row's status.
 
 ### Record an email response (`GET ?action=respond`)
 Opened when a customer clicks a CTA in the email — returns a branded HTML page and
@@ -507,9 +515,14 @@ function styleFieldTable_(table) {
 
 /**
  * Send a branded Qyrova email via Gmail.
- * `body` arrives with placeholders already replaced. We wrap it in branded HTML
- * and append Approve / Decline / Negotiate buttons that reply to the SENDING
- * account (Session user) — so no Gmail address is hardcoded.
+ * `body` arrives with placeholders already replaced. We wrap it in branded HTML.
+ *
+ * Two modes:
+ *  - plainMode: true (Qyrova's default) — a clean, professional email with ONLY
+ *    the message and a single secure "View Quotation" button (body.quoteUrl).
+ *    The recipient views / downloads / signs / approves on that page.
+ *  - legacy (plainMode falsy) — appends Approve / Decline / Negotiate buttons
+ *    that reply to this Web App (kept for backwards compatibility).
  */
 function sendEmail(body) {
   if (!body.to) return { success: false, error: "Missing recipient email." };
@@ -522,7 +535,7 @@ function sendEmail(body) {
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   var bodyHtml = safe.replace(/\n/g, "<br>");
 
-  // CTAs are HTTP links back to this Web App; clicking records the decision.
+  // Legacy CTAs: HTTP links back to this Web App; clicking records the decision.
   function cta(label, decision, color) {
     var url = webAppUrl + "?action=respond" +
       "&spreadsheetId=" + encodeURIComponent(body.spreadsheetId || "") +
@@ -532,6 +545,27 @@ function sendEmail(body) {
     return '<a href="' + url + '" style="display:inline-block;padding:10px 18px;margin:4px;' +
       'border-radius:8px;background:' + color + ';color:#fff;text-decoration:none;font-weight:600;">' +
       label + '</a>';
+  }
+
+  // Footer block: ONE secure document button in plainMode, legacy CTAs otherwise.
+  var actionsHtml;
+  if (body.plainMode) {
+    actionsHtml = body.quoteUrl
+      ? '<div style="margin-top:24px;text-align:center;">' +
+          '<a href="' + body.quoteUrl + '" style="display:inline-block;padding:12px 32px;' +
+          'border-radius:8px;background:#635bff;color:#fff;text-decoration:none;font-weight:600;">' +
+          'View Quotation</a>' +
+          '<p style="margin-top:12px;font-size:12px;color:#8c91a3;">' +
+          'Open the secure link to view, download, and respond to your quotation.</p>' +
+        '</div>'
+      : '';
+  } else {
+    actionsHtml =
+      '<div style="margin-top:24px;text-align:center;">' +
+        cta("Approve", "Approved", "#2b9a66") +
+        cta("Decline", "Declined", "#e5484d") +
+        cta("Negotiate", "Negotiate", "#b7791f") +
+      '</div>';
   }
 
   // Optional company logo (right side of the header) as an inline image (cid),
@@ -554,11 +588,7 @@ function sendEmail(body) {
       '</tr></table>' +
       '<div style="border:1px solid #e7e8ee;border-top:none;border-radius:0 0 12px 12px;padding:24px;">' +
         '<div style="font-size:14px;line-height:1.65;color:#3a3f4d;">' + bodyHtml + '</div>' +
-        '<div style="margin-top:24px;text-align:center;">' +
-          cta("Approve", "Approved", "#2b9a66") +
-          cta("Decline", "Declined", "#e5484d") +
-          cta("Negotiate", "Negotiate", "#b7791f") +
-        '</div>' +
+        actionsHtml +
         '<p style="margin-top:24px;font-size:12px;color:#8c91a3;">Sent via Qyrova</p>' +
       '</div></div>';
 

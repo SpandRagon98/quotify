@@ -23,6 +23,7 @@ import {
   presetSheetId,
   presetDocId,
 } from "../../services/quotationService";
+import { recordDocument } from "../../lib/docRegistry";
 
 export default function QuotationPreview({
   preset,
@@ -55,6 +56,7 @@ export default function QuotationPreview({
       const res = await save();
       setResult(res);
       setPrintId(res.meta.quotationId);
+      recordDocument(res.meta.quotationId, { docType: "native" });
       const mockNote = res.sheetResult?.mocked ? " (offline — see console)" : "";
       setStatus({
         state: "success",
@@ -76,6 +78,10 @@ export default function QuotationPreview({
         ? await updateQuotation(preset, values, editingQuotationId, { generateDoc: true, createdAt: editingCreatedAt })
         : await submitQuotation(preset, values, { generateDoc: true });
       setResult(res);
+      recordDocument(res.meta.quotationId, {
+        docType: "googledoc",
+        docUrl: res.docResult?.docUrl || "",
+      });
       const mockNote = res.sheetResult?.mocked ? " (offline — see console)" : "";
       setStatus({
         state: "success",

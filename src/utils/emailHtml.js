@@ -1,12 +1,11 @@
 /**
  * Branded transactional email HTML (Phase 2).
  *
- * Produces an inbox-friendly, table-based HTML email with the company's branding
- * and three tokenized CTA buttons (Approve / Negotiate / Decline). Each CTA is a
- * link to the recipient's own tracked-quote page carrying an `intent` — the page
- * requires an explicit confirm, so link prefetching by mail clients can never
- * trigger a false response. All actions hit YOUR backend (Supabase), never the
- * open Apps Script endpoint.
+ * Produces a clean, inbox-friendly, table-based HTML email with the company's
+ * branding, the quotation message, and a SINGLE secure "View Quotation" button
+ * linking to the recipient's tracked-quote page. All approval / signature
+ * actions happen on that page (your backend) — the email itself carries no
+ * approve/decline boxes, keeping it simple and professional.
  */
 
 function escapeHtml(s) {
@@ -20,11 +19,6 @@ function escapeHtml(s) {
 /** Plain text → safe HTML with line breaks preserved. */
 function textToHtml(s) {
   return escapeHtml(s).replace(/\r?\n/g, "<br>");
-}
-
-function intentUrl(quoteUrl, intent) {
-  const sep = quoteUrl.includes("?") ? "&" : "?";
-  return `${quoteUrl}${sep}intent=${intent}`;
 }
 
 /**
@@ -51,15 +45,6 @@ export function buildQuoteEmailHtml({
   const logoImg = companyLogo
     ? `<img src="${escapeHtml(companyLogo)}" alt="" height="34" style="max-height:34px;border:0;display:block;" />`
     : "";
-
-  const btn = (label, href, bg, color, border) => `
-    <td style="padding:0 6px;">
-      <a href="${escapeHtml(href)}" target="_blank"
-         style="display:inline-block;padding:11px 20px;border-radius:10px;font:600 14px/1 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-                color:${color};background:${bg};border:1px solid ${border};text-decoration:none;">
-        ${escapeHtml(label)}
-      </a>
-    </td>`;
 
   return `<!doctype html>
 <html lang="en">
@@ -99,23 +84,18 @@ export function buildQuoteEmailHtml({
                </td></tr>`
             : ""
         }
-        <!-- CTAs -->
+        <!-- Single secure document link -->
         <tr>
-          <td style="padding:22px 28px 6px;">
-            <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-              ${btn("✓ Approve", intentUrl(quoteUrl, "approved"), "#0f9d6e", "#ffffff", "#0f9d6e")}
-              ${btn("Negotiate", intentUrl(quoteUrl, "negotiate"), "#ffffff", "#1a1d21", "#d7dbe0")}
-              ${btn("Decline", intentUrl(quoteUrl, "declined"), "#ffffff", "#1a1d21", "#d7dbe0")}
-            </tr></table>
-          </td>
-        </tr>
-        <!-- View full quotation -->
-        <tr>
-          <td style="padding:10px 28px 26px;">
+          <td style="padding:24px 28px 26px;" align="center">
             <a href="${escapeHtml(quoteUrl)}" target="_blank"
-               style="font-size:13px;color:${accent};text-decoration:none;">
-              View the full quotation &rarr;
+               style="display:inline-block;padding:13px 34px;border-radius:10px;
+                      font:600 15px/1 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+                      color:#ffffff;background:${accent};text-decoration:none;">
+              View Quotation
             </a>
+            <div style="margin-top:14px;font-size:12px;color:#9aa1ab;">
+              Open the secure link to view, download, and respond to your quotation.
+            </div>
           </td>
         </tr>
         <!-- Footer -->

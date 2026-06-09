@@ -15,9 +15,11 @@ export const APP = {
 
 /** Theme accent options exposed in Settings (CSS handles the palettes). */
 export const ACCENTS = [
-  { value: "indigo", label: "Indigo", color: "#635bff" },
+  { value: "indigo", label: "Qyrova Classic", color: "#635bff" },
   { value: "violet", label: "Violet", color: "#7c5cff" },
   { value: "blue", label: "Blue", color: "#2f7df6" },
+  { value: "ocean", label: "Ocean", color: "#0c7cba" },
+  { value: "sapphire", label: "Sapphire", color: "#1e56c8" },
   { value: "cyan", label: "Cyan", color: "#0bb3d6" },
   { value: "emerald", label: "Emerald", color: "#0f9d6e" },
   { value: "rose", label: "Rose", color: "#e8497b" },
@@ -110,4 +112,5 @@ export const STORAGE_KEYS = {
   companyLogos: "quotify.companyLogos.v1",
   notifications: "quotify.notifications.v1",
   notifSeen: "quotify.notifSeen.v1",
+  docRegistry: "quotify.docRegistry.v1",
 };

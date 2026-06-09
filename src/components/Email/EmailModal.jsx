@@ -24,6 +24,7 @@ import { sendViaResend } from "../../services/resendClient";
 import { presetSheetId, presetDocId } from "../../services/quotationService";
 import { useCompanyProfile } from "../../hooks/useCompanyProfile";
 import { APP, EMAIL } from "../../config/appConfig";
+import { getDocRecord } from "../../lib/docRegistry";
 import {
   trackingEnabled,
   createTrackedQuote,
@@ -47,7 +48,9 @@ export default function EmailModal({
   const seed = savedTemplate || defaultEmailTemplate(preset);
   const [subject, setSubject] = useState(seed.subject);
   const [body, setBody] = useState(seed.body);
-  const [attachMode, setAttachMode] = useState("native"); // native | googledoc | none
+  // Default is link-only ("none"): clean professional email with just the
+  // message + secure document link. Attachments remain available if wanted.
+  const [attachMode, setAttachMode] = useState("none"); // none | native | googledoc
   const [status, setStatus] = useState({ state: "idle", message: "" });
 
   // Tracked quotes (Phase 1): create a shareable /q/<token> link on send and
@@ -93,16 +96,24 @@ export default function EmailModal({
     };
   }, [open, canTrack, quotationId]);
 
-  const buildSnapshot = () => ({
-    preset: { id: preset.id, name: preset.name, fields: preset.fields },
-    values: rowDoc.values,
-    quotationId: quotationId || rowDoc.quotationId,
-    logo: cfg.logo || "",
-    banner: cfg.banner || "",
-    description: cfg.description || "",
-    hiddenFields: cfg.hiddenFields || [],
-    extraContent: cfg.extraContent || [],
-  });
+  const buildSnapshot = () => {
+    const qid = quotationId || rowDoc.quotationId;
+    const docRec = getDocRecord(qid);
+    return {
+      preset: { id: preset.id, name: preset.name, fields: preset.fields },
+      values: rowDoc.values,
+      quotationId: qid,
+      logo: cfg.logo || "",
+      banner: cfg.banner || "",
+      description: cfg.description || "",
+      hiddenFields: cfg.hiddenFields || [],
+      extraContent: cfg.extraContent || [],
+      // Saved document type — the public page opens the right artifact.
+      docType: docRec?.docType || "native",
+      docUrl: docRec?.docUrl || "",
+      presetName: preset.name,
+    };
+  };
 
   const trackStatusLabel = (s) =>
     ({ sent: "Sent", viewed: "Viewed", approved: "Accepted", declined: "Declined", negotiate: "Changes requested", expired: "Expired" }[s] || s);
@@ -207,6 +218,10 @@ export default function EmailModal({
         spreadsheetId: presetSheetId(preset),
         sheetTabName: preset.sheetTabName,
         companyLogo: logo || "",
+        // Clean email: no Approve/Decline/Negotiate boxes — a single secure
+        // document link instead (needs the updated Apps Script; see setup doc).
+        plainMode: true,
+        quoteUrl: trackUrl || "",
       };
 
       if (attachMode === "native") {
@@ -229,7 +244,7 @@ export default function EmailModal({
       setStatus({
         state: "sent",
         message: trackUrl
-          ? `Email sent to ${recipient}. A tracked link was included.`
+          ? `Email sent to ${recipient} with the secure document link.`
           : `Email sent to ${recipient}.`,
       });
       if (canTrack) latestTrackedQuote(quotationId).then(setTracking);
@@ -442,6 +457,8 @@ export default function EmailModal({
                     {tracking.view_count > 0 && ` · ${tracking.view_count} view${tracking.view_count === 1 ? "" : "s"}`}
                     {tracking.signed_name && ` · signed: ${tracking.signed_name}`}
                     {tracking.response_note && ` · "${tracking.response_note}"`}
+                    {tracking.created_at &&
+                      ` · last sent ${new Date(tracking.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`}
                   </span>
                 </div>
               )}
@@ -460,17 +477,18 @@ export default function EmailModal({
             <div className="email-preview-content">
               <div className="email-preview-subject">{previewSubject || "(no subject)"}</div>
               <div className="email-preview-body">{previewBody}</div>
-              <div className="email-preview-ctas">
-                <span className="email-cta cta-approve">Approve</span>
-                <span className="email-cta cta-decline">Decline</span>
-                <span className="email-cta cta-negotiate">Negotiate</span>
-              </div>
+              {(trackOn || provider === "resend") && canTrack && (
+                <div className="email-preview-ctas">
+                  <span className="email-cta cta-viewdoc">View Quotation</span>
+                </div>
+              )}
               <div className="email-preview-foot">Sent via Qyrova</div>
             </div>
           </div>
           <p className="form-hint">
-            The Approve / Decline / Negotiate buttons update this record's status when clicked.
-            {attachMode !== "none" && " The quotation PDF is attached automatically."}
+            The email contains only your message and the secure document link — the
+            recipient views, downloads, and approves/signs from that page.
+            {attachMode !== "none" && " The quotation PDF is also attached."}
           </p>
         </div>
       </div>

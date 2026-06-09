@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Database as DatabaseIcon,
@@ -21,6 +21,39 @@ import { rowToFormValues } from "../../utils/rowMapping";
 import { elementToPdfBlobUrl } from "../../utils/pdf";
 import { deleteQuotation } from "../../services/quotationService";
 import { METADATA_COLUMNS } from "../../config/appConfig";
+import { loadDocRegistry, getDocRecord } from "../../lib/docRegistry";
+import { listTrackedQuotes, trackingEnabled } from "../../lib/quoteTracking";
+
+const TRACK_LABEL = {
+  sent: "Sent",
+  viewed: "Viewed",
+  approved: "Accepted",
+  declined: "Declined",
+  negotiate: "Changes",
+  expired: "Expired",
+};
+
+/** "Document" cell: generated type + live tracked status for one row. */
+function DocStatusCell({ record, tracked }) {
+  return (
+    <div className="doc-status-cell">
+      {record ? (
+        <span className={`doc-badge ${record.docType === "googledoc" ? "doc-badge-gdoc" : "doc-badge-native"}`}>
+          {record.docType === "googledoc" ? "Google Doc" : "Native PDF"}
+        </span>
+      ) : (
+        <span className="doc-badge doc-badge-none">Not generated</span>
+      )}
+      {tracked && TRACK_LABEL[tracked.status] && (
+        <span className={`mini-pill mini-pill-${tracked.status}`} title={
+          tracked.view_count ? `${tracked.view_count} view${tracked.view_count === 1 ? "" : "s"}` : undefined
+        }>
+          {TRACK_LABEL[tracked.status]}
+        </span>
+      )}
+    </div>
+  );
+}
 
 export default function DatabasePage({
   presets,
@@ -36,9 +69,32 @@ export default function DatabasePage({
   const [filters, setFilters] = useState({});
   const [notice, setNotice] = useState({ state: "idle", message: "" });
   const [viewRow, setViewRow] = useState(null);
+  const [trackedMap, setTrackedMap] = useState({});
   const pdfStageRef = useRef(null);
 
   const viewDoc = viewRow && preset ? rowToFormValues(preset, data.headers, viewRow) : null;
+
+  // Document registry (generated type + Google Doc URL per quotation) and the
+  // live tracked-quote statuses, refreshed whenever the sheet data reloads.
+  const registry = useMemo(() => loadDocRegistry(), [data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const qidIdx = data.headers.indexOf(METADATA_COLUMNS[0]); // "Quotation ID"
+
+  useEffect(() => {
+    if (!trackingEnabled() || state !== "loaded") return undefined;
+    let cancelled = false;
+    listTrackedQuotes().then((quotes) => {
+      if (cancelled) return;
+      const map = {};
+      // Listed newest-first; keep the first (latest) entry per quotation.
+      quotes.forEach((q) => {
+        if (q.quotation_id && !map[q.quotation_id]) map[q.quotation_id] = q;
+      });
+      setTrackedMap(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [state, data]);
 
   // Switching preset also clears the active search/filters.
   const handleSelectPreset = (id) => {
@@ -90,31 +146,52 @@ export default function DatabasePage({
     }
   }, [preset, data.headers, reload]);
 
-  // View Quote — generate the native PDF for this row on demand and open it.
-  const handleViewQuote = useCallback(async (row) => {
+  // View — open the saved document for this row based on its generated type:
+  // Google Doc rows open the generated Doc; native (or untyped) rows render the
+  // native PDF on demand. The window is opened SYNCHRONOUSLY inside the click
+  // so pop-up blockers don't eat it, then pointed at the result.
+  const handleViewQuote = useCallback((row) => {
     if (!preset) return;
+    const quotationId = qidIdx === -1 ? "" : String(row[qidIdx] ?? "");
+    const rec = getDocRecord(quotationId);
+
+    if (rec?.docType === "googledoc") {
+      if (rec.docUrl) {
+        window.open(rec.docUrl, "_blank", "noopener");
+        return;
+      }
+      setNotice({
+        state: "info",
+        message:
+          "No document generated yet — load this row and generate the Google Doc first.",
+      });
+      return;
+    }
+
+    // Native PDF: claim the tab now (user gesture), fill it once captured.
+    const win = window.open("", "_blank");
     setViewRow(row);
     setNotice({ state: "working", message: "Preparing the quotation document…" });
-    // Wait for the hidden stage to render the selected row, then capture.
     requestAnimationFrame(() => {
       setTimeout(async () => {
         try {
           if (!pdfStageRef.current) throw new Error("Could not prepare the document.");
           const url = await elementToPdfBlobUrl(pdfStageRef.current);
-          const win = window.open(url, "_blank");
-          if (!win) {
-            setNotice({ state: "info", message: "Pop-up blocked — allow pop-ups to view the document." });
-          } else {
+          if (win) {
+            win.location.href = url;
             setNotice({ state: "idle", message: "" });
+          } else {
+            setNotice({ state: "info", message: "Pop-up blocked — allow pop-ups to view the document." });
           }
         } catch (err) {
+          if (win) win.close();
           setNotice({ state: "error", message: err.message });
         } finally {
           setViewRow(null);
         }
       }, 80);
     });
-  }, [preset]);
+  }, [preset, qidIdx]);
 
   const rowActions = useMemo(
     () =>
@@ -135,11 +212,25 @@ export default function DatabasePage({
         {
           label: "View",
           icon: FileText,
-          title: "View the generated quotation document (PDF)",
+          title: "Open this row's document (Google Doc or native PDF, per how it was generated)",
           onClick: handleViewQuote,
         },
       ].filter(Boolean),
     [onLoadQuotation, canDelete, handleLoadRow, handleDeleteRow, handleViewQuote]
+  );
+
+  // "Document" status column: generated type + live tracked status per row.
+  const leadingColumns = useMemo(
+    () => [
+      {
+        header: "Document",
+        render: (row) => {
+          const qid = qidIdx === -1 ? "" : String(row[qidIdx] ?? "");
+          return <DocStatusCell record={registry[qid]} tracked={trackedMap[qid]} />;
+        },
+      },
+    ],
+    [qidIdx, registry, trackedMap]
   );
 
   const exportCsv = () => {
@@ -249,6 +340,7 @@ export default function DatabasePage({
                 filters={filters}
                 onFilterChange={handleFilter}
                 rowActions={rowActions}
+                leadingColumns={leadingColumns}
               />
             </motion.div>
           )}

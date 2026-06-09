@@ -14,6 +14,7 @@ import Logo from "../common/Logo";
 import DocumentPreview from "../common/DocumentPreview";
 import { APP } from "../../config/appConfig";
 import { downloadElementPdf } from "../../utils/pdf";
+import { extractId } from "../../utils/googleLinks";
 import {
   getTrackedQuote,
   recordQuoteView,
@@ -133,6 +134,12 @@ export default function PublicQuotePage({ token }) {
   };
 
   const handleDownload = async () => {
+    // Google Doc quotes export directly from Google (vector PDF); native quotes
+    // are captured client-side from the rendered document.
+    if (isGoogleDoc && gdocId) {
+      window.open(`https://docs.google.com/document/d/${gdocId}/export?format=pdf`, "_blank", "noopener");
+      return;
+    }
     setDownloading(true);
     try {
       const name = `${snap.presetName || quote?.preset_name || "quotation"}-${
@@ -147,6 +154,10 @@ export default function PublicQuotePage({ token }) {
   };
 
   const snap = quote?.snapshot || {};
+  // Saved document type: Google Doc quotes show the generated Doc; everything
+  // else renders the native document from the snapshot.
+  const gdocId = snap.docType === "googledoc" && snap.docUrl ? extractId(snap.docUrl) : "";
+  const isGoogleDoc = Boolean(gdocId);
   const expired = Boolean(quote?.is_expired) || quote?.status === "expired";
   const alreadyResponded =
     finalStatus ||
@@ -219,9 +230,32 @@ export default function PublicQuotePage({ token }) {
               </button>
             </div>
 
-            <div className="pub-quote-doc">
-              <DocumentPreview {...docProps} />
-            </div>
+            {isGoogleDoc ? (
+              <div className="pub-quote-doc pub-quote-gdoc">
+                <iframe
+                  title="Quotation document"
+                  src={`https://docs.google.com/document/d/${gdocId}/preview`}
+                  className="pub-gdoc-frame"
+                />
+                <div className="pub-gdoc-bar">
+                  <a
+                    href={snap.docUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="pub-quote-chip pub-chip-dl"
+                  >
+                    Open in Google Docs
+                  </a>
+                  <span className="pub-gdoc-hint">
+                    If the document asks for access, use Download PDF instead.
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="pub-quote-doc">
+                <DocumentPreview {...docProps} />
+              </div>
+            )}
 
             <div className="pub-quote-card pub-quote-actions">
               {alreadyResponded ? (
@@ -303,8 +337,9 @@ export default function PublicQuotePage({ token }) {
         Powered by <strong>{APP.name}</strong>
       </footer>
 
-      {/* Off-screen A4 stage used to capture the Download PDF */}
-      {state === "ready" && quote && (
+      {/* Off-screen A4 stage used to capture the Download PDF (native only —
+          Google Doc quotes export their PDF straight from Google) */}
+      {state === "ready" && quote && !isGoogleDoc && (
         <div className="pdf-stage" ref={pdfStageRef} aria-hidden="true">
           <DocumentPreview {...docProps} />
         </div>

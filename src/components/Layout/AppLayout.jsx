@@ -16,6 +16,7 @@ import {
 import { APP, STORAGE_KEYS } from "../../config/appConfig";
 import { ROLE_LABELS } from "../../auth/roles";
 import Logo from "../common/Logo";
+import HelpWalkthrough from "../common/HelpWalkthrough";
 import NotificationBell from "../Notifications/NotificationBell";
 
 const NAV = [
@@ -146,6 +147,7 @@ export default function AppLayout({ active, onNavigate, allowedTabs = [], user, 
           <NotificationBell />
         </div>
         {children}
+        <HelpWalkthrough />
       </main>
     </div>
   );

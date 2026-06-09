@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Mail,
   Send,
@@ -8,6 +8,9 @@ import {
   Loader2,
   AlertCircle,
   Paperclip,
+  Link2,
+  Eye,
+  ExternalLink,
 } from "lucide-react";
 import Modal from "../common/Modal";
 import Logo from "../common/Logo";
@@ -18,6 +21,11 @@ import { elementToPdfBase64 } from "../../utils/pdf";
 import { sendQuotationEmail } from "../../services/emailService";
 import { presetSheetId, presetDocId } from "../../services/quotationService";
 import { useCompanyProfile } from "../../hooks/useCompanyProfile";
+import {
+  trackingEnabled,
+  createTrackedQuote,
+  latestTrackedQuote,
+} from "../../lib/quoteTracking";
 
 /**
  * Email composer for one Database row. Placeholders ({{Header}}) are replaced
@@ -39,6 +47,13 @@ export default function EmailModal({
   const [attachMode, setAttachMode] = useState("native"); // native | googledoc | none
   const [status, setStatus] = useState({ state: "idle", message: "" });
 
+  // Tracked quotes (Phase 1): create a shareable /q/<token> link on send and
+  // show the recipient's view/response status. Available only in cloud mode.
+  const canTrack = trackingEnabled();
+  const [trackOn, setTrackOn] = useState(canTrack);
+  const [trackLink, setTrackLink] = useState("");
+  const [tracking, setTracking] = useState(null); // latest tracked quote status
+
   const subjectRef = useRef(null);
   const bodyRef = useRef(null);
   const lastFocused = useRef("body");
@@ -53,6 +68,35 @@ export default function EmailModal({
   const quotationId =
     row && headers.indexOf("Quotation ID") !== -1 ? String(row[headers.indexOf("Quotation ID")] ?? "") : "";
   const rowDoc = row ? rowToFormValues(preset, headers, row) : { values: {}, quotationId: "" };
+
+  // Load any existing tracking status for this record when the modal opens.
+  useEffect(() => {
+    if (!open || !canTrack) return undefined;
+    let cancelled = false;
+    latestTrackedQuote(quotationId).then((t) => {
+      if (!cancelled) {
+        setTrackLink("");
+        setTracking(t);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, canTrack, quotationId]);
+
+  const buildSnapshot = () => ({
+    preset: { id: preset.id, name: preset.name, fields: preset.fields },
+    values: rowDoc.values,
+    quotationId: quotationId || rowDoc.quotationId,
+    logo: cfg.logo || "",
+    banner: cfg.banner || "",
+    description: cfg.description || "",
+    hiddenFields: cfg.hiddenFields || [],
+    extraContent: cfg.extraContent || [],
+  });
+
+  const trackStatusLabel = (s) =>
+    ({ sent: "Sent", viewed: "Viewed", approved: "Approved", declined: "Declined", negotiate: "Negotiating" }[s] || s);
 
   const insertToken = (token) => {
     const target = lastFocused.current === "subject" ? "subject" : "body";
@@ -80,10 +124,34 @@ export default function EmailModal({
       return;
     }
     try {
+      // Tracked quote: create the shareable link first so it can be embedded.
+      let trackUrl = "";
+      if (trackOn && canTrack) {
+        setStatus({ state: "sending", message: "Creating tracking link…" });
+        const created = await createTrackedQuote({
+          quotationId: quotationId || rowDoc.quotationId,
+          presetName: preset.name,
+          recipientEmail: recipient,
+          snapshot: buildSnapshot(),
+        });
+        trackUrl = created.url;
+        setTrackLink(trackUrl);
+      }
+
+      // Substitute placeholders, then weave in the tracking link.
+      let finalBody = applyPlaceholders(body, headers, row);
+      if (trackUrl) {
+        finalBody = finalBody.includes("{{Quote Link}}")
+          ? finalBody.split("{{Quote Link}}").join(trackUrl)
+          : `${finalBody}\n\n— — —\nView your quotation online and respond:\n${trackUrl}`;
+      } else {
+        finalBody = finalBody.split("{{Quote Link}}").join("");
+      }
+
       const payload = {
         to: recipient,
         subject: applyPlaceholders(subject, headers, row),
-        body: applyPlaceholders(body, headers, row),
+        body: finalBody,
         quotationId,
         presetName: preset.name,
         spreadsheetId: presetSheetId(preset),
@@ -109,14 +177,26 @@ export default function EmailModal({
 
       setStatus({ state: "sending", message: "Sending email…" });
       await sendQuotationEmail(payload);
-      setStatus({ state: "sent", message: `Email sent to ${recipient}.` });
+      setStatus({
+        state: "sent",
+        message: trackUrl
+          ? `Email sent to ${recipient}. A tracked link was included.`
+          : `Email sent to ${recipient}.`,
+      });
+      if (canTrack) latestTrackedQuote(quotationId).then(setTracking);
     } catch (err) {
       setStatus({ state: "error", message: err.message });
     }
   };
 
   const previewSubject = row ? applyPlaceholders(subject, headers, row) : subject;
-  const previewBody = row ? applyPlaceholders(body, headers, row) : body;
+  const rawPreviewBody = row ? applyPlaceholders(body, headers, row) : body;
+  const previewBody =
+    trackOn && canTrack
+      ? rawPreviewBody.includes("{{Quote Link}}")
+        ? rawPreviewBody.split("{{Quote Link}}").join("🔗 [your tracked quotation link]")
+        : `${rawPreviewBody}\n\n— — —\nView your quotation online and respond:\n🔗 [your tracked quotation link]`
+      : rawPreviewBody.split("{{Quote Link}}").join("");
 
   return (
     <Modal
@@ -175,6 +255,17 @@ export default function EmailModal({
           <div className="placeholder-insert">
             <span className="form-label">Insert placeholder</span>
             <div className="placeholder-list">
+              {canTrack && (
+                <button
+                  type="button"
+                  className="placeholder-chip placeholder-chip-btn placeholder-chip-accent"
+                  onClick={() => insertToken("{{Quote Link}}")}
+                  title="Insert the tracked quotation link"
+                >
+                  <code>{`{{Quote Link}}`}</code>
+                  <Link2 size={13} />
+                </button>
+              )}
               {headers.map((h) => (
                 <button
                   key={h}
@@ -210,6 +301,53 @@ export default function EmailModal({
               </button>
             </div>
           </div>
+
+          {/* Tracked quote (Phase 1) — shareable link + view/response status */}
+          {canTrack && (
+            <div className="form-field track-field">
+              <label className="track-toggle">
+                <input
+                  type="checkbox"
+                  checked={trackOn}
+                  onChange={(e) => setTrackOn(e.target.checked)}
+                />
+                <span className="form-label track-toggle-label">
+                  <Link2 size={13} /> Send as a tracked quote
+                </span>
+              </label>
+              <p className="form-hint track-hint">
+                Adds a secure link the recipient opens to view this quotation and
+                Approve / Decline / Negotiate. You'll see views and their response here.
+              </p>
+
+              {trackLink && (
+                <div className="track-link-row">
+                  <ExternalLink size={14} />
+                  <a href={trackLink} target="_blank" rel="noreferrer" className="track-link">
+                    {trackLink}
+                  </a>
+                  <button
+                    type="button"
+                    className="btn btn-soft btn-xs"
+                    onClick={() => navigator.clipboard?.writeText(trackLink)}
+                  >
+                    <Copy size={13} /> Copy
+                  </button>
+                </div>
+              )}
+
+              {tracking && (
+                <div className={`track-status track-status-${tracking.status}`}>
+                  <Eye size={14} />
+                  <span>
+                    <strong>{trackStatusLabel(tracking.status)}</strong>
+                    {tracking.view_count > 0 && ` · ${tracking.view_count} view${tracking.view_count === 1 ? "" : "s"}`}
+                    {tracking.response_note && ` · "${tracking.response_note}"`}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Preview pane — mirrors the actual sent email */}

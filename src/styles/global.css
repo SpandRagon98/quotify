@@ -888,6 +888,98 @@ textarea.control { resize: vertical; }
 .attach-btn.is-active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
 .attach-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
+/* ===== Tracked quotes — Email composer controls (Phase 1) ===== */
+.placeholder-chip-accent { border-color: var(--brand); background: var(--brand-soft); color: var(--brand); }
+.track-field { gap: 8px; }
+.track-toggle { display: flex; align-items: center; gap: 9px; cursor: pointer; }
+.track-toggle input { width: 16px; height: 16px; accent-color: var(--brand); cursor: pointer; }
+.track-toggle-label { display: inline-flex; align-items: center; gap: 6px; margin: 0; cursor: pointer; }
+.track-hint { margin: 2px 0 0; }
+.track-link-row {
+  display: flex; align-items: center; gap: 8px; margin-top: 6px; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2);
+}
+.track-link { flex: 1; min-width: 0; color: var(--brand); font-size: 12.5px; word-break: break-all; text-decoration: none; }
+.track-link:hover { text-decoration: underline; }
+.track-status {
+  display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 11px;
+  border-radius: 10px; font-size: 13px; border: 1px solid var(--border); background: var(--surface-2);
+}
+.track-status strong { font-weight: 650; }
+.track-status-viewed { border-color: color-mix(in srgb, #2f7df6 40%, var(--border)); }
+.track-status-approved { border-color: color-mix(in srgb, #0f9d6e 45%, var(--border)); color: var(--text); }
+.track-status-declined { border-color: color-mix(in srgb, #e8497b 45%, var(--border)); }
+.track-status-negotiate { border-color: color-mix(in srgb, #e0921f 45%, var(--border)); }
+
+/* ===== Public tracked-quote page (/q/:token) ===== */
+.pub-quote {
+  min-height: 100vh; display: flex; flex-direction: column;
+  background: var(--bg); color: var(--text);
+}
+.pub-quote-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px clamp(16px, 5vw, 40px); border-bottom: 1px solid var(--border);
+  background: var(--surface); position: sticky; top: 0; z-index: 5;
+}
+.pub-quote-brand { display: flex; align-items: center; gap: 10px; }
+.pub-quote-mark { display: inline-flex; }
+.pub-quote-name { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
+.pub-quote-secure {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;
+  color: var(--text-soft); padding: 5px 10px; border: 1px solid var(--border);
+  border-radius: 999px; background: var(--surface-2);
+}
+.pub-quote-body {
+  flex: 1; width: 100%; max-width: 860px; margin: 0 auto;
+  padding: clamp(20px, 4vw, 40px) clamp(16px, 5vw, 32px); display: flex; flex-direction: column; gap: 20px;
+}
+.pub-quote-status {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 60px 0; color: var(--text-soft); font-size: 15px;
+}
+.pub-quote-doc {
+  border-radius: 16px; overflow: hidden; box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border); background: var(--surface);
+}
+.pub-quote-doc .doc-paper { margin: 0; max-width: none; box-shadow: none; border-radius: 0; }
+.pub-quote-card {
+  border: 1px solid var(--border); border-radius: 16px; background: var(--surface);
+  padding: clamp(18px, 3vw, 26px); box-shadow: var(--shadow-sm);
+}
+.pub-quote-message { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--text-soft); }
+.pub-quote-message h2 { margin: 4px 0 0; color: var(--text); font-size: 19px; }
+.pub-quote-message svg { color: var(--brand); }
+.pub-quote-prompt { margin: 0 0 14px; font-size: 16px; font-weight: 650; }
+.pub-quote-note { width: 100%; margin-bottom: 12px; resize: vertical; }
+.pub-quote-btns { display: flex; flex-wrap: wrap; gap: 10px; }
+.pub-btn {
+  flex: 1; min-width: 130px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 16px; border-radius: 12px; font-size: 14.5px; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  transition: transform 0.12s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.pub-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.pub-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.pub-btn-approve { background: #0f9d6e; border-color: #0f9d6e; color: #fff; }
+.pub-btn-approve:hover { background: #0c8c61; }
+.pub-btn-negotiate { background: var(--surface-2); }
+.pub-btn-decline { background: var(--surface-2); }
+.pub-btn-decline:hover { border-color: #e8497b; color: #e8497b; }
+.pub-quote-err { margin-top: 12px; }
+.pub-quote-done { display: flex; align-items: center; gap: 14px; }
+.pub-quote-done strong { display: block; font-size: 16px; }
+.pub-quote-done p { margin: 2px 0 0; color: var(--text-soft); font-size: 13.5px; }
+.pub-done-approved svg { color: #0f9d6e; }
+.pub-done-declined svg { color: #e8497b; }
+.pub-done-negotiate svg { color: #e0921f; }
+.pub-quote-foot {
+  text-align: center; padding: 20px; color: var(--text-soft); font-size: 12.5px;
+  border-top: 1px solid var(--border);
+}
+@media (max-width: 520px) {
+  .pub-btn { flex: 1 1 100%; }
+}
+
 /* Off-screen A4 stage used to capture the native PDF attachment */
 .pdf-stage { position: fixed; left: -10000px; top: 0; width: 794px; pointer-events: none; z-index: -1; }
 .pdf-stage .doc-paper {

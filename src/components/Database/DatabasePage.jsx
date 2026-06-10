@@ -24,16 +24,13 @@ import { METADATA_COLUMNS } from "../../config/appConfig";
 import { loadDocRegistry, getDocRecord } from "../../lib/docRegistry";
 
 /**
- * "Document" cell: a View button + the generated document type (Google Doc or
- * Native PDF). Approval status is intentionally NOT shown here — it lives only
- * in the Email tab's approval column.
+ * "Document" cell: ONLY the generated document type (Google Doc / Native PDF /
+ * Not generated). The View action lives in the Actions column; approval status
+ * lives only in the Email tab.
  */
-function DocStatusCell({ record, onView }) {
+function DocStatusCell({ record }) {
   return (
     <div className="doc-status-cell">
-      <button className="btn btn-xs btn-soft" onClick={onView} title="Open this row's document">
-        <FileText size={14} /> View
-      </button>
       {record ? (
         <span className={`doc-badge ${record.docType === "googledoc" ? "doc-badge-gdoc" : "doc-badge-native"}`}>
           {record.docType === "googledoc" ? "Google Doc" : "Native PDF"}
@@ -174,6 +171,12 @@ export default function DatabasePage({
           title: "Load this quotation into the form for editing",
           onClick: handleLoadRow,
         },
+        {
+          label: "View",
+          icon: FileText,
+          title: "Open this row's document (Google Doc or native PDF, per how it was generated)",
+          onClick: handleViewQuote,
+        },
         canDelete && {
           label: "Delete",
           icon: Trash2,
@@ -182,21 +185,22 @@ export default function DatabasePage({
           onClick: handleDeleteRow,
         },
       ].filter(Boolean),
-    [onLoadQuotation, canDelete, handleLoadRow, handleDeleteRow]
+    [onLoadQuotation, canDelete, handleLoadRow, handleViewQuote, handleDeleteRow]
   );
 
-  // "Document" column: View button + generated document type (no approval status).
+  // "Document" column: generated document type only (View is in Actions; approval
+  // status is in the Email tab).
   const leadingColumns = useMemo(
     () => [
       {
         header: "Document",
         render: (row) => {
           const qid = qidIdx === -1 ? "" : String(row[qidIdx] ?? "");
-          return <DocStatusCell record={registry[qid]} onView={() => handleViewQuote(row)} />;
+          return <DocStatusCell record={registry[qid]} />;
         },
       },
     ],
-    [qidIdx, registry, handleViewQuote]
+    [qidIdx, registry]
   );
 
   const exportCsv = () => {

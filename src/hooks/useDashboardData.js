@@ -8,6 +8,8 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchPresetData, presetSheetId } from "../services/quotationService";
 import { METADATA_COLUMNS } from "../config/appConfig";
 import { useNotifications } from "../notifications/useNotifications";
+import { trackedStatusByQuotation } from "../lib/quoteTracking";
+import { resolveDecision } from "../utils/approvalStatus";
 
 const EMPTY = { total: 0, approved: 0, declined: 0, negotiated: 0, pending: 0, latest: null };
 
@@ -28,9 +30,14 @@ export function useDashboardData(presets) {
     setState("loading");
     setError("");
 
-    const results = await Promise.allSettled(
-      linked.map((p) => fetchPresetData(p).then((d) => ({ preset: p, ...d })))
-    );
+    const [results, trackedMap] = await Promise.all([
+      Promise.allSettled(
+        linked.map((p) => fetchPresetData(p).then((d) => ({ preset: p, ...d })))
+      ),
+      // Public approvals live in Supabase; overlay them onto the sheet rows so
+      // the metrics reflect the latest decision (key: Quotation ID).
+      trackedStatusByQuotation().catch(() => ({})),
+    ]);
 
     const agg = { ...EMPTY };
     let anyOk = false;
@@ -53,12 +60,16 @@ export function useDashboardData(presets) {
 
       rows.forEach((row) => {
         agg.total++;
-        const a = ai !== -1 && String(row[ai] ?? "").trim();
-        const d = di !== -1 && String(row[di] ?? "").trim();
-        const n = ni !== -1 && String(row[ni] ?? "").trim();
-        if (a) agg.approved++;
-        else if (d) agg.declined++;
-        else if (n) agg.negotiated++;
+        const qid = qi !== -1 ? String(row[qi] ?? "").trim() : "";
+        const decision = resolveDecision({
+          sheetApproval: ai !== -1 ? row[ai] : "",
+          sheetDecline: di !== -1 ? row[di] : "",
+          sheetNegotiate: ni !== -1 ? row[ni] : "",
+          trackedStatus: trackedMap[qid]?.status,
+        });
+        if (decision === "approved") agg.approved++;
+        else if (decision === "declined") agg.declined++;
+        else if (decision === "negotiate") agg.negotiated++;
         else agg.pending++;
 
         const created = ci !== -1 ? row[ci] : "";

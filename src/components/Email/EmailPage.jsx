@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Mail,
@@ -14,7 +14,9 @@ import EmailModal from "./EmailModal";
 import { useSheetData } from "../../hooks/useSheetData";
 import { useEmailTemplates } from "../../hooks/useEmailTemplates";
 import { searchRows, filterRows } from "../../utils/tableData";
-import { STATUS_COLUMNS } from "../../config/appConfig";
+import { STATUS_COLUMNS, METADATA_COLUMNS } from "../../config/appConfig";
+import { trackedStatusByQuotation, trackingEnabled } from "../../lib/quoteTracking";
+import { STATUS_CELL } from "../../utils/approvalStatus";
 
 export default function EmailPage({ presets, initialPresetId, onEditPreset }) {
   const { presetId, setPresetId, preset, isLinked, data, state, error, reload } =
@@ -24,6 +26,20 @@ export default function EmailPage({ presets, initialPresetId, onEditPreset }) {
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState({});
   const [activeRow, setActiveRow] = useState(null);
+  const [trackedMap, setTrackedMap] = useState({});
+
+  // Overlay the latest public approval decisions (Supabase) so the Approved /
+  // Declined / Negotiation columns reflect what recipients clicked on the link.
+  useEffect(() => {
+    if (!trackingEnabled() || state !== "loaded") return undefined;
+    let cancelled = false;
+    trackedStatusByQuotation().then((m) => {
+      if (!cancelled) setTrackedMap(m);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [state, data]);
 
   const handleSelectPreset = (id) => {
     setQuery("");
@@ -44,7 +60,21 @@ export default function EmailPage({ presets, initialPresetId, onEditPreset }) {
   // sheet doesn't have them yet (no customer has responded).
   const missingStatus = STATUS_COLUMNS.filter((c) => !data.headers.includes(c));
   const tableHeaders = [...data.headers, ...missingStatus];
-  const tableRows = visibleRows.map((r) => [...r, ...missingStatus.map(() => "")]);
+  const qidIdx = data.headers.indexOf(METADATA_COLUMNS[0]); // "Quotation ID"
+  const tableRows = visibleRows.map((r) => {
+    const row = [...r, ...missingStatus.map(() => "")];
+    const qid = qidIdx === -1 ? "" : String(r[qidIdx] ?? "").trim();
+    const tracked = trackedMap[qid];
+    const cell = tracked && STATUS_CELL[tracked.status];
+    if (cell) {
+      // A real decision wins: set its column, clear the other two.
+      STATUS_COLUMNS.forEach((col) => {
+        const ci = tableHeaders.indexOf(col);
+        if (ci !== -1) row[ci] = cell.col === col ? cell.word : "";
+      });
+    }
+    return row;
+  });
 
   return (
     <div className="screen screen-wide">

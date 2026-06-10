@@ -157,6 +157,22 @@ export async function respondToQuote(token, response, note = "", signedName = ""
 }
 
 /**
+ * Owner-side: map of quotationId -> latest tracked quote, for overlaying the
+ * public approval decision onto the Email tab + Dashboard. Returns {} when
+ * tracking is unavailable (no backend / not signed in).
+ */
+export async function trackedStatusByQuotation() {
+  if (!isSupabaseConfigured) return {};
+  const list = await listTrackedQuotes();
+  const map = {};
+  // listTrackedQuotes is ordered newest-first → first seen per id is the latest.
+  for (const q of list) {
+    if (q.quotation_id && !map[q.quotation_id]) map[q.quotation_id] = q;
+  }
+  return map;
+}
+
+/**
  * Owner-side: list the active org's tracked quotes (latest first). Used to poll
  * for real status changes and fire notifications. Returns [] if unavailable.
  */

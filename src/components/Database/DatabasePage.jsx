@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Database as DatabaseIcon,
@@ -22,34 +22,24 @@ import { elementToPdfBlobUrl } from "../../utils/pdf";
 import { deleteQuotation } from "../../services/quotationService";
 import { METADATA_COLUMNS } from "../../config/appConfig";
 import { loadDocRegistry, getDocRecord } from "../../lib/docRegistry";
-import { listTrackedQuotes, trackingEnabled } from "../../lib/quoteTracking";
 
-const TRACK_LABEL = {
-  sent: "Sent",
-  viewed: "Viewed",
-  approved: "Accepted",
-  declined: "Declined",
-  negotiate: "Changes",
-  expired: "Expired",
-};
-
-/** "Document" cell: generated type + live tracked status for one row. */
-function DocStatusCell({ record, tracked }) {
+/**
+ * "Document" cell: a View button + the generated document type (Google Doc or
+ * Native PDF). Approval status is intentionally NOT shown here — it lives only
+ * in the Email tab's approval column.
+ */
+function DocStatusCell({ record, onView }) {
   return (
     <div className="doc-status-cell">
+      <button className="btn btn-xs btn-soft" onClick={onView} title="Open this row's document">
+        <FileText size={14} /> View
+      </button>
       {record ? (
         <span className={`doc-badge ${record.docType === "googledoc" ? "doc-badge-gdoc" : "doc-badge-native"}`}>
           {record.docType === "googledoc" ? "Google Doc" : "Native PDF"}
         </span>
       ) : (
         <span className="doc-badge doc-badge-none">Not generated</span>
-      )}
-      {tracked && TRACK_LABEL[tracked.status] && (
-        <span className={`mini-pill mini-pill-${tracked.status}`} title={
-          tracked.view_count ? `${tracked.view_count} view${tracked.view_count === 1 ? "" : "s"}` : undefined
-        }>
-          {TRACK_LABEL[tracked.status]}
-        </span>
       )}
     </div>
   );
@@ -69,32 +59,14 @@ export default function DatabasePage({
   const [filters, setFilters] = useState({});
   const [notice, setNotice] = useState({ state: "idle", message: "" });
   const [viewRow, setViewRow] = useState(null);
-  const [trackedMap, setTrackedMap] = useState({});
   const pdfStageRef = useRef(null);
 
   const viewDoc = viewRow && preset ? rowToFormValues(preset, data.headers, viewRow) : null;
 
-  // Document registry (generated type + Google Doc URL per quotation) and the
-  // live tracked-quote statuses, refreshed whenever the sheet data reloads.
+  // Document registry: generated type + Google Doc URL per quotation, refreshed
+  // whenever the sheet data reloads. (Approval status lives in the Email tab.)
   const registry = useMemo(() => loadDocRegistry(), [data]); // eslint-disable-line react-hooks/exhaustive-deps
   const qidIdx = data.headers.indexOf(METADATA_COLUMNS[0]); // "Quotation ID"
-
-  useEffect(() => {
-    if (!trackingEnabled() || state !== "loaded") return undefined;
-    let cancelled = false;
-    listTrackedQuotes().then((quotes) => {
-      if (cancelled) return;
-      const map = {};
-      // Listed newest-first; keep the first (latest) entry per quotation.
-      quotes.forEach((q) => {
-        if (q.quotation_id && !map[q.quotation_id]) map[q.quotation_id] = q;
-      });
-      setTrackedMap(map);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [state, data]);
 
   // Switching preset also clears the active search/filters.
   const handleSelectPreset = (id) => {
@@ -209,28 +181,22 @@ export default function DatabasePage({
           title: "Delete this quotation from the Google Sheet",
           onClick: handleDeleteRow,
         },
-        {
-          label: "View",
-          icon: FileText,
-          title: "Open this row's document (Google Doc or native PDF, per how it was generated)",
-          onClick: handleViewQuote,
-        },
       ].filter(Boolean),
-    [onLoadQuotation, canDelete, handleLoadRow, handleDeleteRow, handleViewQuote]
+    [onLoadQuotation, canDelete, handleLoadRow, handleDeleteRow]
   );
 
-  // "Document" status column: generated type + live tracked status per row.
+  // "Document" column: View button + generated document type (no approval status).
   const leadingColumns = useMemo(
     () => [
       {
         header: "Document",
         render: (row) => {
           const qid = qidIdx === -1 ? "" : String(row[qidIdx] ?? "");
-          return <DocStatusCell record={registry[qid]} tracked={trackedMap[qid]} />;
+          return <DocStatusCell record={registry[qid]} onView={() => handleViewQuote(row)} />;
         },
       },
     ],
-    [qidIdx, registry, trackedMap]
+    [qidIdx, registry, handleViewQuote]
   );
 
   const exportCsv = () => {

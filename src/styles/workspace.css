@@ -16,6 +16,7 @@
   --radius:20px; --radius-sm:11px; --radius-lg:24px;
 }
 [data-accent="burgundy"] { --brand:#681b24; --brand-600:#581720; --brand-700:#431116; }
+[data-accent="indigo"] { --brand:#635bff; --brand-600:#5148e9; --brand-700:#4038cf; }
 [data-theme="dark"] {
   --bg:#171416; --surface:#211d20; --surface-2:#2a2427; --text:#f5f0ed;
   --text-soft:#c2b9b4; --text-muted:#a09894; --border:#383033;

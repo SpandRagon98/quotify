@@ -1,9 +1,23 @@
 import { test, expect } from "@playwright/test";
 import { databaseFixture } from "./database-fixture.mjs";
-const nav = (page, name) =>
-  page
-    .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("button", { name, exact: true });
+const nav = (page, name) => ({
+  async click() {
+    const target = page.getByRole("navigation", { name: "Main navigation" })
+      .getByRole("button", { name, exact: true });
+    if (await target.count() === 0) {
+      const section = ['Overview', 'Presets', 'Quotations', 'Documents', 'Email'].includes(name) ? 'Sales'
+        : name === 'Workflows' ? 'Automation' : name === 'Reports' ? 'Reports'
+        : ['Settings', 'Team members', 'Roles & permissions'].includes(name) ? 'Admin' : 'CRM';
+      const close = page.getByRole('button', { name: 'Close menu', exact: true });
+      if (await close.isVisible()) await close.click();
+      await page.getByRole('navigation', { name: 'Workspace sections' })
+        .getByRole('button', { name: section, exact: true }).click();
+    }
+    const open = page.getByRole('button', { name: 'Open menu', exact: true });
+    if (await open.isVisible() && !await target.isVisible()) await open.click();
+    await target.click();
+  },
+});
 test("Lead Inbox → assigned lead → follow-up → conversion → Kanban → Customer 360 → original quotation/PDF", async ({
   page,
 }, testInfo) => {

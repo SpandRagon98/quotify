@@ -6,8 +6,99 @@
 }
 .sidebar .nav {
   overflow-y: auto;
+  scrollbar-width: none;
   min-height: 0;
   gap: 18px;
+}
+.sidebar .nav::-webkit-scrollbar {
+  display: none;
+}
+.sidebar-top,
+.sidebar-bottom {
+  flex-shrink: 0;
+}
+.nav-home-button {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.nav-home-button:hover {
+  color: var(--text);
+}
+.workspace-section-topbar {
+  flex-wrap: wrap;
+  row-gap: 14px;
+  padding: 18px 0;
+}
+.workspace-top-navigation {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.workspace-sections {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.workspace-section-button {
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 9px 12px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.workspace-section-button:hover {
+  background: var(--sidebar-hover);
+  color: var(--text);
+}
+.workspace-section-button.is-selected {
+  background: var(--brand);
+  color: white;
+}
+@media (max-width: 860px) {
+  .workspace-section-topbar .desktop-only {
+    display: none;
+  }
+  .workspace-section-topbar {
+    min-height: 0;
+    padding: 0 0 16px;
+    margin-bottom: 22px;
+  }
+  .workspace-section-button {
+    padding: 9px 10px;
+  }
+}
+@media (max-height: 780px) {
+  .sidebar,
+  .app.is-collapsed .sidebar {
+    gap: 16px;
+    padding-top: 18px;
+    padding-bottom: 14px;
+  }
+  .sidebar .sidebar-top {
+    min-height: 55px;
+    padding-bottom: 14px;
+  }
+  .sidebar .nav-item {
+    min-height: 36px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .sidebar .nav-group {
+    gap: 3px;
+  }
+  .sidebar .nav-group-label {
+    padding-bottom: 6px;
+  }
+  .sidebar .sidebar-user {
+    padding-top: 12px;
+  }
 }
 .sidebar .nav-group {
   flex-shrink: 0;

@@ -23,6 +23,7 @@ import {
 } from "../config/appConfig";
 import { ROLES } from "../auth/roles";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
+import { observeAuthContext } from "../lib/authLifecycle";
 
 const normalize = (email) => String(email || "").trim().toLowerCase();
 
@@ -32,60 +33,59 @@ function useSupabaseAuth() {
   const [ready, setReady] = useState(false);
   const [sessionEmail, setSessionEmail] = useState(null);
   const [profile, setProfile] = useState(null); // { id, email, name, avatar, role, orgId }
+  const [startupError, setStartupError] = useState(null);
 
-  const loadContext = useCallback(async (user) => {
+  const loadContext = useCallback(async (user, signal) => {
     if (!user) {
-      setProfile(null);
-      setSessionEmail(null);
-      return;
+      return null;
     }
     const email = normalize(user.email);
     let name = user.user_metadata?.full_name || email;
     let avatar = "";
     let orgId = null;
-    let role = ROLES.OWNER;
-    try {
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("full_name, avatar_url, default_org_id")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (prof) {
-        name = prof.full_name || name;
-        avatar = prof.avatar_url || "";
-        orgId = prof.default_org_id || null;
-      }
-      if (orgId) {
-        const { data: mem } = await supabase
-          .from("org_members")
-          .select("role")
-          .eq("org_id", orgId)
-          .eq("user_id", user.id)
-          .maybeSingle();
-        if (mem?.role) role = mem.role;
-      }
-    } catch (err) {
-      console.warn("[auth] could not load profile/role:", err?.message || err);
+    // Do not grant owner access when a profile/membership request fails.
+    let role = null;
+    const { data: prof, error: profileError } = await supabase
+      .from("profiles")
+      .select("full_name, avatar_url, default_org_id")
+      .eq("id", user.id)
+      .maybeSingle().abortSignal(signal);
+    if (profileError) throw profileError;
+    if (prof) {
+      name = prof.full_name || name;
+      avatar = prof.avatar_url || "";
+      orgId = prof.default_org_id || null;
     }
-    setProfile({ id: user.id, email, name, avatar, role, orgId });
-    setSessionEmail(email);
+    if (orgId) {
+      const { data: mem, error: memberError } = await supabase
+        .from("org_members")
+        .select("role")
+        .eq("org_id", orgId)
+        .eq("user_id", user.id)
+        .maybeSingle().abortSignal(signal);
+      if (memberError) throw memberError;
+      if (Object.values(ROLES).includes(mem?.role)) role = mem.role;
+    }
+    return { id: user.id, email, name, avatar, role, orgId };
   }, []);
 
   useEffect(() => {
-    let active = true;
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!active) return;
-      await loadContext(data.session?.user || null);
-      setReady(true);
+    return observeAuthContext(supabase.auth, {
+      load: loadContext,
+      onReady: (context) => {
+        setProfile(context);
+        setSessionEmail(context?.email || null);
+        setStartupError(null);
+        setReady(true);
+      },
+      onError: (error) => {
+        console.warn("[auth] startup failed:", error?.message || error);
+        setProfile(null);
+        setSessionEmail(null);
+        setStartupError(error?.message || "Couldn't load your workspace. Please try again.");
+        setReady(true);
+      },
     });
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      await loadContext(session?.user || null);
-      setReady(true);
-    });
-    return () => {
-      active = false;
-      sub?.subscription?.unsubscribe?.();
-    };
   }, [loadContext]);
 
   const login = useCallback(async ({ email, password }) => {
@@ -165,6 +165,7 @@ function useSupabaseAuth() {
 
   return {
     ready,
+    startupError,
     currentUser,
     session: sessionEmail,
     role: profile?.role || null,

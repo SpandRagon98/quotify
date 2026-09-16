@@ -52,6 +52,16 @@ export default function App() {
   // --- Splash, then auth gates (all hooks above run unconditionally) ---
   // Wait for the (cloud) session to restore before deciding which screen to show.
   if (booting || !auth.ready) return <LoadingScreen />;
+  if (auth.startupError) return (
+    <div className="crash-screen">
+      <div className="crash-card" role="alert">
+        <h2>Couldn't open your workspace</h2>
+        <p>{auth.startupError}</p>
+        <p>Your saved data has not been deleted. Retry when your connection is available.</p>
+        <button className="btn btn-primary" onClick={() => window.location.reload()}>Retry Qyrova</button>
+      </div>
+    </div>
+  );
   if (!auth.session) return <AuthScreen onLogin={auth.login} onSignup={auth.signup} />;
   if (!auth.role) return <NoAccessScreen email={auth.session} onLogout={auth.logout} />;
 

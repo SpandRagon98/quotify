@@ -15,6 +15,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from "./supabaseClient";
+import { observeAuthContext } from "./authLifecycle";
 
 let activeUserId = null;
 let activeOrgId = null;
@@ -22,14 +23,14 @@ let started = false;
 const listeners = new Set();
 
 /** Resolve which organization the signed-in user is acting in. */
-async function resolveOrgId(userId) {
+async function resolveOrgId(userId, signal) {
   if (!userId) return null;
   try {
     const { data: profile } = await supabase
       .from("profiles")
       .select("default_org_id")
       .eq("id", userId)
-      .maybeSingle();
+      .maybeSingle().abortSignal(signal);
     if (profile?.default_org_id) return profile.default_org_id;
 
     const { data: membership } = await supabase
@@ -37,7 +38,7 @@ async function resolveOrgId(userId) {
       .select("org_id")
       .eq("user_id", userId)
       .limit(1)
-      .maybeSingle();
+      .maybeSingle().abortSignal(signal);
     return membership?.org_id || null;
   } catch (err) {
     console.warn("[cloud] could not resolve org:", err?.message || err);
@@ -45,9 +46,7 @@ async function resolveOrgId(userId) {
   }
 }
 
-async function applyUser(user) {
-  const nextUserId = user?.id || null;
-  const nextOrgId = nextUserId ? await resolveOrgId(nextUserId) : null;
+function applyContext({ userId: nextUserId, orgId: nextOrgId }) {
   // Supabase fires auth events on every token refresh (~50 min). Only notify
   // subscribers on a REAL identity change — otherwise every store re-hydrates
   // from the cloud mid-session and could clobber in-flight edits.
@@ -61,8 +60,17 @@ async function applyUser(user) {
 export function startCloud() {
   if (!isSupabaseConfigured || started) return;
   started = true;
-  supabase.auth.getSession().then(({ data }) => applyUser(data.session?.user || null));
-  supabase.auth.onAuthStateChange((_event, session) => applyUser(session?.user || null));
+  observeAuthContext(supabase.auth, {
+    load: async (user, signal) => ({
+      userId: user?.id || null,
+      orgId: user?.id ? await resolveOrgId(user.id, signal) : null,
+    }),
+    onReady: applyContext,
+    onError: (error) => {
+      console.warn("[cloud] startup failed:", error?.message || error);
+      applyContext({ userId: null, orgId: null });
+    },
+  });
 }
 
 /**

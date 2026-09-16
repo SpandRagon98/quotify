@@ -25,6 +25,8 @@ import { presetSheetId, presetDocId } from "../../services/quotationService";
 import { useCompanyProfile } from "../../hooks/useCompanyProfile";
 import { APP, EMAIL } from "../../config/appConfig";
 import { getDocRecord } from "../../lib/docRegistry";
+import {currentOrgId} from '../../lib/cloudStore';
+import {rpc} from '../../crm/service';
 import {
   trackingEnabled,
   createTrackedQuote,
@@ -142,6 +144,11 @@ export default function EmailModal({
     getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#635bff";
 
   const handleSend = async () => {
+    const logHistory=async()=>{
+      if(!canTrack||!currentOrgId())return '';
+      try{await rpc('crm_log_quote_email',{p_org:currentOrgId(),p_quotation:quotationId,p_preset:preset.id,p_recipient:recipient});return '';}
+      catch(error){return ` CRM email history could not update: ${error.message}. The email has already been sent; don't resend it for this reason.`;}
+    };
     if (!recipient) {
       setStatus({ state: "error", message: "No email address found in this row." });
       return;
@@ -199,7 +206,8 @@ export default function EmailModal({
         }
         setStatus({ state: "sending", message: "Sending branded email via Resend…" });
         await sendViaResend({ to: recipient, subject: finalSubject, html, text: messageText, attachments });
-        setStatus({ state: "sent", message: `Branded email sent to ${recipient} via Resend.` });
+        const historyWarning=await logHistory();
+        setStatus({ state: "sent", message: `Branded email sent to ${recipient} via Resend.${historyWarning}` });
         if (canTrack) latestTrackedQuote(quotationId).then(setTracking);
         return;
       }
@@ -241,11 +249,12 @@ export default function EmailModal({
 
       setStatus({ state: "sending", message: "Sending email…" });
       await sendQuotationEmail(payload);
+      const historyWarning=await logHistory();
       setStatus({
         state: "sent",
         message: trackUrl
-          ? `Email sent to ${recipient} with the secure document link.`
-          : `Email sent to ${recipient}.`,
+          ? `Email sent to ${recipient} with the secure document link.${historyWarning}`
+          : `Email sent to ${recipient}.${historyWarning}`,
       });
       if (canTrack) latestTrackedQuote(quotationId).then(setTracking);
     } catch (err) {

@@ -153,14 +153,14 @@ function useSupabaseAuth() {
     }
   }, []);
 
-  // Team RBAC (inviting teammates by email + server-enforced roles) is the next
-  // increment; the schema already supports it. For now the owner sees themselves.
+  // Cloud team administration now uses the CRM membership RPCs. Keep this legacy
+  // hook shape for existing/local screens; do not mutate cloud roles from here.
   const userList = profile ? [{ email: profile.email, role: profile.role, owner: true }] : [];
   const upsertUser = useCallback(() => {}, []);
   const removeUser = useCallback(() => {}, []);
 
   const currentUser = profile
-    ? { email: profile.email, role: profile.role, name: profile.name, avatar: profile.avatar }
+    ? { id:profile.id, orgId:profile.orgId, email: profile.email, role: profile.role, name: profile.name, avatar: profile.avatar }
     : null;
 
   return {

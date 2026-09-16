@@ -1,7 +1,15 @@
-import { useEffect, useRef } from "react";
-import { NotificationsContext, useNotificationsStore } from "./useNotifications";
+import { useEffect, useRef, useState } from "react";
+import {
+  NotificationsContext,
+  useNotificationsStore,
+} from "./useNotifications";
 import { cloudEnabled, onCloudAuth } from "../lib/cloudStore";
 import { listTrackedQuotes } from "../lib/quoteTracking";
+import {
+  notifications,
+  markNotificationsRead,
+  dismissNotifications,
+} from "../crm/service";
 
 // DB statuses worth notifying about, with the label shown on the bell pill.
 const DB_STATUS_LABEL = {
@@ -20,8 +28,33 @@ const POLL_MS = 45000;
  * changes / expired), firing notifications on actual DB transitions instead of
  * diffing spreadsheet columns. Polls on an interval and on tab focus.
  */
-export default function NotificationsProvider({ children }) {
+export default function NotificationsProvider({ children, user }) {
   const store = useNotificationsStore();
+  const [crmItems, setCrmItems] = useState([]);
+  const [notificationError, setNotificationError] = useState("");
+  useEffect(() => {
+    if (!user?.orgId) return undefined;
+    let active = true;
+    const poll = async () => {
+      try {
+        const rows = await notifications(user.orgId);
+        if (active) {
+          setCrmItems(rows);
+          setNotificationError("");
+        }
+      } catch (error) {
+        if (active) setNotificationError(error.message);
+      }
+    };
+    poll();
+    const interval = setInterval(poll, POLL_MS);
+    window.addEventListener("focus", poll);
+    return () => {
+      active = false;
+      clearInterval(interval);
+      window.removeEventListener("focus", poll);
+    };
+  }, [user?.id, user?.orgId]);
   const addNotificationRef = useRef(store.addNotification);
   useEffect(() => {
     addNotificationRef.current = store.addNotification;
@@ -43,7 +76,11 @@ export default function NotificationsProvider({ children }) {
         const prev = baseline.get(q.id);
         baseline.set(q.id, q.status);
         if (firstPass) return; // seed silently on the first poll
-        if (prev !== undefined && prev !== q.status && DB_STATUS_LABEL[q.status]) {
+        if (
+          prev !== undefined &&
+          prev !== q.status &&
+          DB_STATUS_LABEL[q.status]
+        ) {
           addNotificationRef.current({
             id: `tq-${q.id}-${q.status}-${q.updated_at || ""}`,
             quotationId: q.quotation_id || "(untitled)",
@@ -88,7 +125,58 @@ export default function NotificationsProvider({ children }) {
   }, []);
 
   return (
-    <NotificationsContext.Provider value={store}>
+    <NotificationsContext.Provider
+      value={{
+        ...store,
+        items: [
+          ...crmItems.map((n) => ({
+            id: "crm-" + n.id,
+            crmId: n.id,
+            status: "CRM",
+            quotationId: n.title,
+            customer: n.body || "",
+            time: n.created_at,
+            read: !!n.read_at,
+            entityType: n.entity_type,
+            entityId: n.entity_id,
+          })),
+          ...store.items,
+        ]
+          .sort((a, b) => new Date(b.time) - new Date(a.time))
+          .slice(0, 60),
+        unreadCount:
+          crmItems.filter((n) => !n.read_at).length + store.unreadCount,
+        error: notificationError,
+        markAllRead: async () => {
+          store.markAllRead();
+          if (crmItems.length)
+            try {
+              await markNotificationsRead(
+                user.orgId,
+                crmItems.map((n) => n.id),
+              );
+              setCrmItems((old) =>
+                old.map((n) => ({ ...n, read_at: new Date().toISOString() })),
+              );
+            } catch (e) {
+              setNotificationError(e.message);
+            }
+        },
+        clearAll: async () => {
+          store.clearAll();
+          if (crmItems.length)
+            try {
+              await dismissNotifications(
+                user.orgId,
+                crmItems.map((n) => n.id),
+              );
+              setCrmItems([]);
+            } catch (e) {
+              setNotificationError(e.message);
+            }
+        },
+      }}
+    >
       {children}
     </NotificationsContext.Provider>
   );

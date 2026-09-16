@@ -16,7 +16,12 @@ import DataTable from "./DataTable";
 import DocumentPreview from "../common/DocumentPreview";
 import { useSheetData } from "../../hooks/useSheetData";
 import { useCompanyProfile } from "../../hooks/useCompanyProfile";
-import { searchRows, filterRows, toCsv, downloadCsv } from "../../utils/tableData";
+import {
+  searchRows,
+  filterRows,
+  toCsv,
+  downloadCsv,
+} from "../../utils/tableData";
 import { rowToFormValues } from "../../utils/rowMapping";
 import { elementToPdfBlobUrl } from "../../utils/pdf";
 import { deleteQuotation } from "../../services/quotationService";
@@ -32,7 +37,9 @@ function DocStatusCell({ record }) {
   return (
     <div className="doc-status-cell">
       {record ? (
-        <span className={`doc-badge ${record.docType === "googledoc" ? "doc-badge-gdoc" : "doc-badge-native"}`}>
+        <span
+          className={`doc-badge ${record.docType === "googledoc" ? "doc-badge-gdoc" : "doc-badge-native"}`}
+        >
           {record.docType === "googledoc" ? "Google Doc" : "Native PDF"}
         </span>
       ) : (
@@ -45,20 +52,31 @@ function DocStatusCell({ record }) {
 export default function DatabasePage({
   presets,
   initialPresetId,
+  initialQuery = "",
   canDelete = false,
+  canExport = true,
   onEditPreset,
   onLoadQuotation,
 }) {
-  const { presetId, setPresetId, preset, isLinked, data, state, error, reload } =
-    useSheetData(presets, initialPresetId);
+  const {
+    presetId,
+    setPresetId,
+    preset,
+    isLinked,
+    data,
+    state,
+    error,
+    reload,
+  } = useSheetData(presets, initialPresetId);
   const cfg = useCompanyProfile(presetId);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [filters, setFilters] = useState({});
   const [notice, setNotice] = useState({ state: "idle", message: "" });
   const [viewRow, setViewRow] = useState(null);
   const pdfStageRef = useRef(null);
 
-  const viewDoc = viewRow && preset ? rowToFormValues(preset, data.headers, viewRow) : null;
+  const viewDoc =
+    viewRow && preset ? rowToFormValues(preset, data.headers, viewRow) : null;
 
   // Document registry: generated type + Google Doc URL per quotation, refreshed
   // whenever the sheet data reloads. (Approval status lives in the Email tab.)
@@ -81,86 +99,110 @@ export default function DatabasePage({
   // state (notice banners, etc.) changes.
   const handleFilter = useCallback(
     (header, value) => setFilters((prev) => ({ ...prev, [header]: value })),
-    []
+    [],
   );
 
   // Load a saved row back into its preset's form for editing.
   const handleLoadRow = useCallback(
     (row) => {
       if (!preset || !onLoadQuotation) return;
-      const { values, quotationId, createdAt } = rowToFormValues(preset, data.headers, row);
+      const { values, quotationId, createdAt } = rowToFormValues(
+        preset,
+        data.headers,
+        row,
+      );
       onLoadQuotation({ presetId: preset.id, values, quotationId, createdAt });
     },
-    [preset, onLoadQuotation, data.headers]
+    [preset, onLoadQuotation, data.headers],
   );
 
   // Delete a row from the linked Google Sheet (Owner/Admin only).
-  const handleDeleteRow = useCallback(async (row) => {
-    const idIdx = data.headers.indexOf(METADATA_COLUMNS[0]); // "Quotation ID"
-    const quotationId = idIdx === -1 ? "" : String(row[idIdx] ?? "");
-    if (!quotationId) {
-      setNotice({ state: "error", message: "This row has no Quotation ID — cannot delete." });
-      return;
-    }
-    if (!window.confirm(`Delete quotation ${quotationId}? This removes it from the Google Sheet.`)) {
-      return;
-    }
-    try {
-      setNotice({ state: "working", message: `Deleting ${quotationId}…` });
-      await deleteQuotation(preset, quotationId);
-      setNotice({ state: "success", message: `Deleted ${quotationId}.` });
-      await reload();
-    } catch (err) {
-      setNotice({ state: "error", message: err.message });
-    }
-  }, [preset, data.headers, reload]);
+  const handleDeleteRow = useCallback(
+    async (row) => {
+      const idIdx = data.headers.indexOf(METADATA_COLUMNS[0]); // "Quotation ID"
+      const quotationId = idIdx === -1 ? "" : String(row[idIdx] ?? "");
+      if (!quotationId) {
+        setNotice({
+          state: "error",
+          message: "This row has no Quotation ID — cannot delete.",
+        });
+        return;
+      }
+      if (
+        !window.confirm(
+          `Delete quotation ${quotationId}? This removes it from the Google Sheet.`,
+        )
+      ) {
+        return;
+      }
+      try {
+        setNotice({ state: "working", message: `Deleting ${quotationId}…` });
+        await deleteQuotation(preset, quotationId);
+        setNotice({ state: "success", message: `Deleted ${quotationId}.` });
+        await reload();
+      } catch (err) {
+        setNotice({ state: "error", message: err.message });
+      }
+    },
+    [preset, data.headers, reload],
+  );
 
   // View — open the saved document for this row based on its generated type:
   // Google Doc rows open the generated Doc; native (or untyped) rows render the
   // native PDF on demand. The window is opened SYNCHRONOUSLY inside the click
   // so pop-up blockers don't eat it, then pointed at the result.
-  const handleViewQuote = useCallback((row) => {
-    if (!preset) return;
-    const quotationId = qidIdx === -1 ? "" : String(row[qidIdx] ?? "");
-    const rec = getDocRecord(quotationId);
+  const handleViewQuote = useCallback(
+    (row) => {
+      if (!preset) return;
+      const quotationId = qidIdx === -1 ? "" : String(row[qidIdx] ?? "");
+      const rec = getDocRecord(quotationId);
 
-    if (rec?.docType === "googledoc") {
-      if (rec.docUrl) {
-        window.open(rec.docUrl, "_blank", "noopener");
+      if (rec?.docType === "googledoc") {
+        if (rec.docUrl) {
+          window.open(rec.docUrl, "_blank", "noopener");
+          return;
+        }
+        setNotice({
+          state: "info",
+          message:
+            "No document generated yet — load this row and generate the Google Doc first.",
+        });
         return;
       }
-      setNotice({
-        state: "info",
-        message:
-          "No document generated yet — load this row and generate the Google Doc first.",
-      });
-      return;
-    }
 
-    // Native PDF: claim the tab now (user gesture), fill it once captured.
-    const win = window.open("", "_blank");
-    setViewRow(row);
-    setNotice({ state: "working", message: "Preparing the quotation document…" });
-    requestAnimationFrame(() => {
-      setTimeout(async () => {
-        try {
-          if (!pdfStageRef.current) throw new Error("Could not prepare the document.");
-          const url = await elementToPdfBlobUrl(pdfStageRef.current);
-          if (win) {
-            win.location.href = url;
-            setNotice({ state: "idle", message: "" });
-          } else {
-            setNotice({ state: "info", message: "Pop-up blocked — allow pop-ups to view the document." });
+      // Native PDF: claim the tab now (user gesture), fill it once captured.
+      const win = window.open("", "_blank");
+      setViewRow(row);
+      setNotice({
+        state: "working",
+        message: "Preparing the quotation document…",
+      });
+      requestAnimationFrame(() => {
+        setTimeout(async () => {
+          try {
+            if (!pdfStageRef.current)
+              throw new Error("Could not prepare the document.");
+            const url = await elementToPdfBlobUrl(pdfStageRef.current);
+            if (win) {
+              win.location.href = url;
+              setNotice({ state: "idle", message: "" });
+            } else {
+              setNotice({
+                state: "info",
+                message: "Pop-up blocked — allow pop-ups to view the document.",
+              });
+            }
+          } catch (err) {
+            if (win) win.close();
+            setNotice({ state: "error", message: err.message });
+          } finally {
+            setViewRow(null);
           }
-        } catch (err) {
-          if (win) win.close();
-          setNotice({ state: "error", message: err.message });
-        } finally {
-          setViewRow(null);
-        }
-      }, 80);
-    });
-  }, [preset, qidIdx]);
+        }, 80);
+      });
+    },
+    [preset, qidIdx],
+  );
 
   const rowActions = useMemo(
     () =>
@@ -174,7 +216,8 @@ export default function DatabasePage({
         {
           label: "View",
           icon: FileText,
-          title: "Open this row's document (Google Doc or native PDF, per how it was generated)",
+          title:
+            "Open this row's document (Google Doc or native PDF, per how it was generated)",
           onClick: handleViewQuote,
         },
         canDelete && {
@@ -185,7 +228,13 @@ export default function DatabasePage({
           onClick: handleDeleteRow,
         },
       ].filter(Boolean),
-    [onLoadQuotation, canDelete, handleLoadRow, handleViewQuote, handleDeleteRow]
+    [
+      onLoadQuotation,
+      canDelete,
+      handleLoadRow,
+      handleViewQuote,
+      handleDeleteRow,
+    ],
   );
 
   // "Document" column: generated document type only (View is in Actions; approval
@@ -200,7 +249,7 @@ export default function DatabasePage({
         },
       },
     ],
-    [qidIdx, registry]
+    [qidIdx, registry],
   );
 
   const exportCsv = () => {
@@ -213,7 +262,9 @@ export default function DatabasePage({
       <header className="screen-head">
         <div>
           <h1 className="screen-title">Database</h1>
-          <p className="screen-sub">Browse data saved to each preset's linked Google Sheet.</p>
+          <p className="screen-sub">
+            Browse data saved to each preset's linked Google Sheet.
+          </p>
         </div>
         <div className="head-actions">
           <select
@@ -223,11 +274,21 @@ export default function DatabasePage({
           >
             {presets.length === 0 && <option value="">No presets</option>}
             {presets.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
             ))}
           </select>
-          <button className="btn btn-soft" onClick={reload} disabled={!isLinked || state === "loading"}>
-            <RefreshCw size={16} className={state === "loading" ? "spin" : ""} /> Refresh
+          <button
+            className="btn btn-soft"
+            onClick={reload}
+            disabled={!isLinked || state === "loading"}
+          >
+            <RefreshCw
+              size={16}
+              className={state === "loading" ? "spin" : ""}
+            />{" "}
+            Refresh
           </button>
         </div>
       </header>
@@ -237,7 +298,10 @@ export default function DatabasePage({
           <Link2 size={26} />
           <p>This preset has no Google Sheet linked yet.</p>
           {preset && (
-            <button className="btn btn-primary" onClick={() => onEditPreset(preset.id)}>
+            <button
+              className="btn btn-primary"
+              onClick={() => onEditPreset(preset.id)}
+            >
               Link a Google Sheet
             </button>
           )}
@@ -254,28 +318,38 @@ export default function DatabasePage({
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
-            <button
-              className="btn btn-soft"
-              onClick={exportCsv}
-              disabled={visibleRows.length === 0}
-            >
-              <Download size={16} /> Export CSV
-            </button>
+            {canExport && (
+              <button
+                className="btn btn-soft"
+                onClick={exportCsv}
+                disabled={visibleRows.length === 0}
+              >
+                <Download size={16} /> Export CSV
+              </button>
+            )}
           </div>
 
           {notice.state !== "idle" && (
             <div
               className={`alert alert-${
-                notice.state === "error" ? "error" : notice.state === "success" ? "success" : "info"
+                notice.state === "error"
+                  ? "error"
+                  : notice.state === "success"
+                    ? "success"
+                    : "info"
               }`}
             >
-              {notice.state === "working" && <Loader2 size={16} className="spin" />}
+              {notice.state === "working" && (
+                <Loader2 size={16} className="spin" />
+              )}
               <span>{notice.message}</span>
             </div>
           )}
 
           {state === "loading" && (
-            <div className="db-state"><Loader2 size={20} className="spin" /> Loading data…</div>
+            <div className="db-state">
+              <Loader2 size={20} className="spin" /> Loading data…
+            </div>
           )}
 
           {state === "error" && (
@@ -292,7 +366,9 @@ export default function DatabasePage({
           )}
 
           {state === "loaded" && visibleRows.length === 0 && (
-            <div className="empty-inline">No rows match your search/filters.</div>
+            <div className="empty-inline">
+              No rows match your search/filters.
+            </div>
           )}
 
           {state === "loaded" && visibleRows.length > 0 && (

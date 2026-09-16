@@ -28,7 +28,7 @@ function relativeTime(iso) {
 }
 
 export default function NotificationBell({ compact = false }) {
-  const { items, unreadCount, markAllRead, clearAll } = useNotifications();
+  const { items, unreadCount, markAllRead, clearAll,error } = useNotifications();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -90,11 +90,12 @@ export default function NotificationBell({ compact = false }) {
             </div>
 
             <div className="notif-list">
+              {error&&<p className="form-error">Couldn't update CRM notifications: {error}</p>}
               {items.length === 0 ? (
                 <div className="notif-empty">
                   <CheckCheck size={22} />
                   <p>You're all caught up.</p>
-                  <span>Status changes on your quotations show up here.</span>
+                  <span>Quotation updates, assignments and activity reminders show up here.</span>
                 </div>
               ) : (
                 items.map((n) => (

@@ -22,7 +22,10 @@ import {
   updateQuotation,
   presetSheetId,
   presetDocId,
+  buildDocPayload,
 } from "../../services/quotationService";
+import { generateDocument } from "../../services/googleDocsService";
+import { linkQuotation } from "../../crm/service";
 import { recordDocument } from "../../lib/docRegistry";
 
 export default function QuotationPreview({
@@ -32,6 +35,9 @@ export default function QuotationPreview({
   editingCreatedAt,
   onBack,
   onUpdated,
+  crmContext,
+  user,
+  canEditMeta = true,
 }) {
   const [status, setStatus] = useState({ state: "idle", message: "" });
   const [result, setResult] = useState(null);
@@ -42,12 +48,48 @@ export default function QuotationPreview({
 
   const isEditMode = Boolean(editingQuotationId);
   const docId = presetDocId(preset);
-  const previewUrl = docId ? `https://docs.google.com/document/d/${docId}/preview` : "";
+  const previewUrl = docId
+    ? `https://docs.google.com/document/d/${docId}/preview`
+    : "";
 
-  const save = async () =>
-    isEditMode
-      ? updateQuotation(preset, values, editingQuotationId, { generateDoc: false, createdAt: editingCreatedAt })
-      : submitQuotation(preset, values, { generateDoc: false });
+  const save = async (withDoc = false) => {
+    // Keep the saved ID even if Docs or CRM linking fails: retry must not append a second row.
+    let res =
+      result ||
+      (await (isEditMode
+        ? updateQuotation(preset, values, editingQuotationId, {
+            generateDoc: false,
+            createdAt: editingCreatedAt,
+          })
+        : submitQuotation(preset, values, { generateDoc: false })));
+    setResult(res);
+    if (withDoc && !res.docResult) {
+      res = {
+        ...res,
+        docResult: await generateDocument(
+          buildDocPayload(preset, values, res.meta),
+        ),
+      };
+      setResult(res);
+    }
+    if (user?.orgId) {
+      try {
+        await linkQuotation(
+          user,
+          crmContext,
+          preset,
+          values,
+          res,
+          withDoc ? "googledoc" : "native",
+        );
+      } catch (error) {
+        throw new Error(
+          `Quotation ${res.meta.quotationId} is saved, but CRM linking failed: ${error.message}. Retry here to link the same quotation; do not create another.`,
+        );
+      }
+    }
+    return res;
+  };
 
   /** Native: save the row, then print/export the native document via the browser. */
   const generatePreview = async () => {
@@ -57,7 +99,9 @@ export default function QuotationPreview({
       setResult(res);
       setPrintId(res.meta.quotationId);
       recordDocument(res.meta.quotationId, { docType: "native" });
-      const mockNote = res.sheetResult?.mocked ? " (offline — see console)" : "";
+      const mockNote = res.sheetResult?.mocked
+        ? " (offline — see console)"
+        : "";
       setStatus({
         state: "success",
         message: `Saved as ${res.meta.quotationId}. Opening print dialog — choose “Save as PDF”.${mockNote}`,
@@ -73,16 +117,19 @@ export default function QuotationPreview({
   const generateGoogleDoc = async () => {
     setDocDialog(false);
     try {
-      setStatus({ state: "saving", message: "Saving & generating Google Doc…" });
-      const res = isEditMode
-        ? await updateQuotation(preset, values, editingQuotationId, { generateDoc: true, createdAt: editingCreatedAt })
-        : await submitQuotation(preset, values, { generateDoc: true });
+      setStatus({
+        state: "saving",
+        message: "Saving & generating Google Doc…",
+      });
+      const res = await save(true);
       setResult(res);
       recordDocument(res.meta.quotationId, {
         docType: "googledoc",
         docUrl: res.docResult?.docUrl || "",
       });
-      const mockNote = res.sheetResult?.mocked ? " (offline — see console)" : "";
+      const mockNote = res.sheetResult?.mocked
+        ? " (offline — see console)"
+        : "";
       setStatus({
         state: "success",
         message: `Saved as ${res.meta.quotationId}. Google Doc generated.${mockNote}`,
@@ -94,17 +141,27 @@ export default function QuotationPreview({
   };
 
   const busy = status.state === "saving";
-  const docReady = status.state === "success" && status.flow === "googledoc" && result?.docResult?.docUrl;
+  const docReady =
+    status.state === "success" &&
+    status.flow === "googledoc" &&
+    result?.docResult?.docUrl;
 
   return (
     <div className="screen screen-wide">
       <header className="screen-head">
         <div className="head-with-back">
-          <button className="icon-btn" onClick={onBack} title="Back to form" disabled={busy}>
+          <button
+            className="icon-btn"
+            onClick={onBack}
+            title="Back to form"
+            disabled={busy}
+          >
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1 className="screen-title">{isEditMode ? "Review changes" : "Review quotation"}</h1>
+            <h1 className="screen-title">
+              {isEditMode ? "Review changes" : "Review quotation"}
+            </h1>
             <p className="screen-sub">
               {isEditMode
                 ? `Editing quotation ${editingQuotationId} · ${preset.name}`
@@ -117,30 +174,41 @@ export default function QuotationPreview({
       {isEditMode && (
         <div className="edit-banner">
           <span className="edit-banner-text">
-            <Pencil size={15} /> Editing quotation: <strong>{editingQuotationId}</strong>{" "}
-            — the same Google Sheet row will be updated (no new row created).
+            <Pencil size={15} /> Editing quotation:{" "}
+            <strong>{editingQuotationId}</strong> — the same Google Sheet row
+            will be updated (no new row created).
           </span>
         </div>
       )}
 
       {/* Version toggle (same as Doc View) */}
       <div className="doc-toggle">
-        <button className={`doc-toggle-btn ${docMode === "native" ? "is-active" : ""}`} onClick={() => setDocMode("native")}>
+        <button
+          className={`doc-toggle-btn ${docMode === "native" ? "is-active" : ""}`}
+          onClick={() => setDocMode("native")}
+        >
           <LayoutTemplate size={16} /> Native View
         </button>
-        <button className={`doc-toggle-btn ${docMode === "googledoc" ? "is-active" : ""}`} onClick={() => setDocMode("googledoc")}>
+        <button
+          className={`doc-toggle-btn ${docMode === "googledoc" ? "is-active" : ""}`}
+          onClick={() => setDocMode("googledoc")}
+        >
           <FileText size={16} /> Google Doc View
         </button>
       </div>
 
       {docMode === "native" ? (
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+        >
           <DocumentPreview
             preset={preset}
             values={values}
             quotationId={editingQuotationId}
             mode="data"
-            editMeta
+            editMeta={canEditMeta}
             logo={cfg.logo}
             banner={cfg.banner}
             description={cfg.description}
@@ -154,17 +222,31 @@ export default function QuotationPreview({
           />
         </motion.div>
       ) : preset.googleDocUrl ? (
-        <motion.div className="doc-stage" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+        <motion.div
+          className="doc-stage"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+        >
           <div className="doc-page">
-            <iframe title={`${preset.name} Google Doc template`} src={previewUrl} className="doc-frame" />
+            <iframe
+              title={`${preset.name} Google Doc template`}
+              src={previewUrl}
+              className="doc-frame"
+            />
           </div>
-          <p className="doc-hint">Linked Google Doc template — placeholders will be filled on Generate.</p>
+          <p className="doc-hint">
+            Linked Google Doc template — placeholders will be filled on
+            Generate.
+          </p>
         </motion.div>
       ) : (
         <div className="empty-state">
           <Link2 size={26} />
           <p>No Google Doc template linked to this preset yet.</p>
-          <p className="form-hint">Generate will guide you to create and link one.</p>
+          <p className="form-hint">
+            Generate will guide you to create and link one.
+          </p>
         </div>
       )}
 
@@ -181,19 +263,38 @@ export default function QuotationPreview({
       )}
 
       {docReady && (
-        <motion.div className="doc-link-card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+        <motion.div
+          className="doc-link-card"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
           <div>
             <div className="doc-link-label">Generated Google Doc</div>
-            <a href={result.docResult.docUrl} target="_blank" rel="noreferrer" className="doc-link-url">
+            <a
+              href={result.docResult.docUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="doc-link-url"
+            >
               {result.docResult.docUrl}
             </a>
           </div>
           <div className="doc-link-actions">
-            <a className="btn btn-secondary" href={result.docResult.docUrl} target="_blank" rel="noreferrer">
+            <a
+              className="btn btn-secondary"
+              href={result.docResult.docUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
               <FileText size={16} /> Open / Edit Google Doc
             </a>
             {result.docResult.pdfUrl && (
-              <a className="btn btn-primary" href={result.docResult.pdfUrl} target="_blank" rel="noreferrer">
+              <a
+                className="btn btn-primary"
+                href={result.docResult.pdfUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
                 <FileDown size={16} /> Download Google Doc as PDF
               </a>
             )}
@@ -207,7 +308,9 @@ export default function QuotationPreview({
           Back &amp; edit
         </button>
 
-        {status.state === "success" && status.flow === "googledoc" && isEditMode ? (
+        {status.state === "success" &&
+        status.flow === "googledoc" &&
+        isEditMode ? (
           <button className="btn btn-primary" onClick={onUpdated}>
             <DatabaseIcon size={18} /> Back to Database
           </button>
@@ -216,12 +319,20 @@ export default function QuotationPreview({
             className="btn btn-primary"
             onClick={generatePreview}
             disabled={busy}
-            title={presetSheetId(preset) ? "Save and download the native Qyrova PDF" : "Link a Google Sheet to this preset first"}
+            title={
+              presetSheetId(preset)
+                ? "Save and download the native Qyrova PDF"
+                : "Link a Google Sheet to this preset first"
+            }
           >
             <Printer size={18} /> Generate &amp; Download PDF
           </button>
         ) : (
-          <button className="btn btn-primary" onClick={() => setDocDialog(true)} disabled={busy}>
+          <button
+            className="btn btn-primary"
+            onClick={() => setDocDialog(true)}
+            disabled={busy}
+          >
             <FileText size={18} /> Generate Google Doc
           </button>
         )}
@@ -234,7 +345,12 @@ export default function QuotationPreview({
         onClose={() => setDocDialog(false)}
         footer={
           <>
-            <button className="btn btn-soft" onClick={() => setDocDialog(false)}>Cancel</button>
+            <button
+              className="btn btn-soft"
+              onClick={() => setDocDialog(false)}
+            >
+              Cancel
+            </button>
             <button className="btn btn-primary" onClick={generateGoogleDoc}>
               <FileText size={16} /> Continue Generating Google Doc
             </button>
@@ -242,17 +358,21 @@ export default function QuotationPreview({
         }
       >
         <div className="doc-warn">
-          <span className="doc-warn-icon"><AlertTriangle size={20} /></span>
+          <span className="doc-warn-icon">
+            <AlertTriangle size={20} />
+          </span>
           <div>
             <p>
-              To generate a Google Doc correctly, you must manually create the Google
-              Doc template and place the required placeholders — like{" "}
-              <code>{"{{Customer Name}}"}</code>, <code>{"{{Quotation Number}}"}</code>, etc. —
-              in the correct positions, then link it to this preset.
+              To generate a Google Doc correctly, you must manually create the
+              Google Doc template and place the required placeholders — like{" "}
+              <code>{"{{Customer Name}}"}</code>,{" "}
+              <code>{"{{Quotation Number}}"}</code>, etc. — in the correct
+              positions, then link it to this preset.
             </p>
             <p className="form-hint">
-              Tip: open Doc View → Native Version to copy the exact placeholder names for
-              this preset. Qyrova replaces them with the entered values.
+              Tip: open Doc View → Native Version to copy the exact placeholder
+              names for this preset. Qyrova replaces them with the entered
+              values.
             </p>
           </div>
         </div>
@@ -273,7 +393,7 @@ export default function QuotationPreview({
             extraContent={cfg.extraContent}
           />
         </div>,
-        document.body
+        document.body,
       )}
     </div>
   );

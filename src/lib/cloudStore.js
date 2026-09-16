@@ -19,6 +19,7 @@ import { observeAuthContext } from "./authLifecycle";
 
 let activeUserId = null;
 let activeOrgId = null;
+let activeRole = null;
 let started = false;
 const listeners = new Set();
 
@@ -30,7 +31,8 @@ async function resolveOrgId(userId, signal) {
       .from("profiles")
       .select("default_org_id")
       .eq("id", userId)
-      .maybeSingle().abortSignal(signal);
+      .maybeSingle()
+      .abortSignal(signal);
     if (profile?.default_org_id) return profile.default_org_id;
 
     const { data: membership } = await supabase
@@ -38,7 +40,8 @@ async function resolveOrgId(userId, signal) {
       .select("org_id")
       .eq("user_id", userId)
       .limit(1)
-      .maybeSingle().abortSignal(signal);
+      .maybeSingle()
+      .abortSignal(signal);
     return membership?.org_id || null;
   } catch (err) {
     console.warn("[cloud] could not resolve org:", err?.message || err);
@@ -46,13 +49,23 @@ async function resolveOrgId(userId, signal) {
   }
 }
 
-function applyContext({ userId: nextUserId, orgId: nextOrgId }) {
+function applyContext({
+  userId: nextUserId,
+  orgId: nextOrgId,
+  role: nextRole = null,
+}) {
   // Supabase fires auth events on every token refresh (~50 min). Only notify
   // subscribers on a REAL identity change — otherwise every store re-hydrates
   // from the cloud mid-session and could clobber in-flight edits.
-  if (nextUserId === activeUserId && nextOrgId === activeOrgId) return;
+  if (
+    nextUserId === activeUserId &&
+    nextOrgId === activeOrgId &&
+    nextRole === activeRole
+  )
+    return;
   activeUserId = nextUserId;
   activeOrgId = nextOrgId;
+  activeRole = nextRole;
   listeners.forEach((cb) => cb({ userId: activeUserId, orgId: activeOrgId }));
 }
 
@@ -61,10 +74,22 @@ export function startCloud() {
   if (!isSupabaseConfigured || started) return;
   started = true;
   observeAuthContext(supabase.auth, {
-    load: async (user, signal) => ({
-      userId: user?.id || null,
-      orgId: user?.id ? await resolveOrgId(user.id, signal) : null,
-    }),
+    load: async (user, signal) => {
+      const orgId = user?.id ? await resolveOrgId(user.id, signal) : null;
+      let role = null;
+      if (orgId) {
+        const { data, error } = await supabase
+          .from("org_members")
+          .select("role")
+          .eq("org_id", orgId)
+          .eq("user_id", user.id)
+          .maybeSingle()
+          .abortSignal(signal);
+        if (error) throw error;
+        role = data?.role || null;
+      }
+      return { userId: user?.id || null, orgId, role };
+    },
     onReady: applyContext,
     onError: (error) => {
       console.warn("[cloud] startup failed:", error?.message || error);
@@ -111,13 +136,23 @@ export async function loadCloudState(key) {
 
 /** Write-through a collection blob for the active org (fire-and-forget). */
 export async function saveCloudState(key, value) {
-  if (!isSupabaseConfigured || !activeOrgId) return;
+  if (
+    !isSupabaseConfigured ||
+    !activeOrgId ||
+    !["owner", "admin", "editor"].includes(activeRole)
+  )
+    return;
   try {
     const { error } = await supabase
       .from("app_state")
       .upsert(
-        { org_id: activeOrgId, key, data: value, updated_at: new Date().toISOString() },
-        { onConflict: "org_id,key" }
+        {
+          org_id: activeOrgId,
+          key,
+          data: value,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "org_id,key" },
       );
     if (error) throw error;
   } catch (err) {

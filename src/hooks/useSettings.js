@@ -16,13 +16,13 @@ function load() {
       const parsed = JSON.parse(raw);
       return {
         mode: MODES.includes(parsed.mode) ? parsed.mode : "light",
-        accent: parsed.accent || "indigo",
+        accent: parsed.accent || "burgundy",
       };
     }
   } catch {
     // ignore
   }
-  return { mode: "light", accent: "indigo" };
+  return { mode: "light", accent: "burgundy" };
 }
 
 export function useSettings() {

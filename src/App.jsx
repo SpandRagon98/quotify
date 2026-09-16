@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import AppLayout from "./components/Layout/AppLayout";
+import AppLayout from "./components/Layout/WorkspaceLayout";
 import LoadingScreen from "./components/common/LoadingScreen";
-import Dashboard from "./components/Dashboard/Dashboard";
+import Dashboard from "./components/Dashboard/Overview";
 import PresetManager from "./components/PresetManager/PresetManager";
 import PresetEditor from "./components/PresetManager/PresetEditor";
 import DynamicForm from "./components/DynamicForm/DynamicForm";
@@ -197,6 +197,8 @@ export default function App() {
         return (
           <Dashboard
             presets={presets}
+            userName={auth.currentUser.name || "there"}
+            onOpenDatabase={(presetId) => go("database", { presetId })}
             onCreatePreset={() => go("editor", { presetId: null })}
             onOpenForm={(id) => go("form", { presetId: id })}
             onManagePresets={() => go("presets")}

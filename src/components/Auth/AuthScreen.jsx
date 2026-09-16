@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { LogIn, UserPlus, Mail, Lock, User, AlertCircle, Loader2, CheckCircle2 } from "lucide-react";
+import { LogIn, UserPlus, Mail, Lock, User, AlertCircle, Loader2, CheckCircle2, ArrowUpRight, FileText, Eye, EyeOff } from "lucide-react";
 import { APP } from "../../config/appConfig";
 import Logo from "../common/Logo";
 
@@ -58,6 +58,12 @@ export default function AuthScreen({ onLogin, onSignup }) {
 
   return (
     <div className="auth-shell">
+      <section className="auth-story">
+        <div className="auth-story-brand"><Logo size={30} /><span>Qyrova.</span><ArrowUpRight size={19} /></div>
+        <div className="auth-story-copy"><span className="auth-story-kicker">LESS ADMIN. MORE POSSIBILITY.</span><h2>From first quote<br />to next <em>yes.</em></h2><p>A thoughtful workspace for the details, documents, and decisions that move your business forward.</p></div>
+        <div className="auth-document" aria-hidden="true"><div className="auth-document-head"><FileText size={22} /><span>Quotation preview</span><span className="auth-doc-number">01</span></div><h3>Built for your business.</h3><p>Your brand. Your fields. Your next opportunity.</p>{["Project scope", "Services & pricing", "Terms & details"].map((label) => <div className="auth-document-line" key={label}><span>{label}</span><span /></div>)}<div className="auth-document-ready"><CheckCircle2 size={16} />Ready for the next step</div></div>
+        <div className="auth-story-foot"><span>Clarity at every step.</span><span>Designed around you ↗</span></div>
+      </section>
       <motion.form
         className="auth-card"
         onSubmit={submit}
@@ -73,9 +79,10 @@ export default function AuthScreen({ onLogin, onSignup }) {
           </div>
         </div>
 
-        <h1 className="auth-title">{isSignup ? "Create your account" : "Welcome back"}</h1>
+        <span className="screen-eyebrow">YOUR WORKSPACE AWAITS</span>
+        <h1 className="auth-title">{isSignup ? "Start something better." : "Welcome back."}</h1>
         <p className="auth-sub">
-          {isSignup ? "Sign up to get started." : "Sign in to continue to Qyrova."}
+          {isSignup ? "Create an account and make every quotation count." : "Sign in and pick up where you left off."}
         </p>
 
         <AnimatePresence mode="wait" initial={false}>
@@ -127,6 +134,7 @@ export default function AuthScreen({ onLogin, onSignup }) {
 }
 
 function Field({ icon: Icon, label, value, type, placeholder, onChange }) {
+  const [showPassword, setShowPassword] = useState(false);
   return (
     <label className="form-field">
       <span className="form-label">{label}</span>
@@ -134,11 +142,13 @@ function Field({ icon: Icon, label, value, type, placeholder, onChange }) {
         <Icon size={16} />
         <input
           className="auth-input-field"
-          type={type}
+          aria-label={label}
+          type={type === "password" && showPassword ? "text" : type}
           value={value}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
         />
+        {type === "password" && <button className="auth-password-toggle" type="button" onClick={() => setShowPassword((show) => !show)} aria-label={showPassword ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button>}
       </div>
     </label>
   );

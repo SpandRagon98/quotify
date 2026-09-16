@@ -4,7 +4,7 @@
  *   - Outfit  : display headings + brand
  * Loaded over the network; no local font files required.
  */
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap");
+/* The redesigned web workspace loads self-hosted DM Sans in main.jsx. */
 
 /* ===================== Design tokens ===================== */
 :root {
@@ -22,9 +22,9 @@
   --text-muted: #8c91a3;
 
   /* Accent (default = indigo) — only these 3 change per theme; the rest derive. */
-  --brand: #635bff;
-  --brand-600: #574fef;
-  --brand-700: #483fd6;
+  --brand: #681b24;
+  --brand-600: #581720;
+  --brand-700: #431116;
 
   /* Derived from --brand so EVERY accent updates consistently. */
   --brand-soft: color-mix(in srgb, var(--brand) 12%, #ffffff);

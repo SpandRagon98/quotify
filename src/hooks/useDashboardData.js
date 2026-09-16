@@ -11,7 +11,7 @@ import { useNotifications } from "../notifications/useNotifications";
 import { trackedStatusByQuotation } from "../lib/quoteTracking";
 import { resolveDecision } from "../utils/approvalStatus";
 
-const EMPTY = { total: 0, approved: 0, declined: 0, negotiated: 0, pending: 0, latest: null };
+const EMPTY = { total: 0, approved: 0, declined: 0, negotiated: 0, pending: 0, latest: null, recent: [], activity: [] };
 
 export function useDashboardData(presets) {
   const [state, setState] = useState("idle"); // idle | loading | loaded | empty | error
@@ -23,6 +23,7 @@ export function useDashboardData(presets) {
     const linked = presets.filter((p) => presetSheetId(p));
     if (linked.length === 0) {
       setStats(EMPTY);
+      setError("");
       setState("empty");
       return;
     }
@@ -40,6 +41,7 @@ export function useDashboardData(presets) {
     ]);
 
     const agg = { ...EMPTY };
+    const records = [];
     let anyOk = false;
     let firstError = "";
 
@@ -73,6 +75,7 @@ export function useDashboardData(presets) {
         else agg.pending++;
 
         const created = ci !== -1 ? row[ci] : "";
+        records.push({ quotationId: qid, presetId: preset.id, presetName: preset.name, createdAt: created, decision });
         if (created && (!agg.latest || String(created) > String(agg.latest.createdAt))) {
           agg.latest = {
             quotationId: qi !== -1 ? String(row[qi] ?? "") : "",
@@ -81,6 +84,23 @@ export function useDashboardData(presets) {
           };
         }
       });
+    });
+
+    agg.recent = records.sort((a, b) => {
+      const at = new Date(a.createdAt).getTime() || 0;
+      const bt = new Date(b.createdAt).getTime() || 0;
+      return bt - at;
+    }).slice(0, 5);
+    const now = new Date();
+    agg.activity = Array.from({ length: 6 }, (_, index) => {
+      const month = new Date(now.getFullYear(), now.getMonth() - 5 + index, 1);
+      return {
+        label: month.toLocaleDateString(undefined, { month: "short" }),
+        value: records.filter((record) => {
+          const date = new Date(record.createdAt);
+          return date.getFullYear() === month.getFullYear() && date.getMonth() === month.getMonth();
+        }).length,
+      };
     });
 
     setStats(agg);

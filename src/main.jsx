@@ -1,6 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import "@fontsource-variable/dm-sans";
 import "./styles/global.css";
+import "./styles/workspace.css";
 import App from "./App.jsx";
 import PublicQuotePage from "./components/PublicQuote/PublicQuotePage.jsx";
 import ErrorBoundary from "./components/common/ErrorBoundary.jsx";

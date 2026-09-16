@@ -15,6 +15,7 @@ export const APP = {
 
 /** Theme accent options exposed in Settings (CSS handles the palettes). */
 export const ACCENTS = [
+  { value: "burgundy", label: "Burgundy", color: "#681b24" },
   { value: "indigo", label: "Qyrova Classic", color: "#635bff" },
   { value: "violet", label: "Violet", color: "#7c5cff" },
   { value: "blue", label: "Blue", color: "#2f7df6" },

@@ -13,6 +13,7 @@ function FieldInput({ field, value, error, onChange, compact = false }) {
   };
 
   const common = {
+    "aria-label": field.label,
     className: `control ${error ? "control-error" : ""}`,
     placeholder: field.placeholder || "",
   };
@@ -35,6 +36,7 @@ function FieldInput({ field, value, error, onChange, compact = false }) {
         <label className="switch">
           <input
             type="checkbox"
+            aria-label={field.label}
             checked={Boolean(value)}
             onChange={(e) => emit(e.target.checked)}
           />

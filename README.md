@@ -18,6 +18,7 @@ to Google Sheets and/or generate a document from a Doc template.
 - 🗄️ **Database tab** — browse a preset's linked sheet in a premium table with search, per-column filters, refresh, CSV export, and loading/empty/error states
 - 💾 **localStorage persistence** — presets are saved locally (swappable for a backend later); old presets auto-migrate
 - 🎨 **Modern SaaS UI** — sidebar dashboard, smooth Framer Motion transitions, responsive layout
+- 🤖 **Telegram Lead Inbox bot** — secure guided Telegram enquiries can be reviewed and converted in the CRM
 
 ## Tech stack
 
@@ -172,3 +173,9 @@ Apps Script code and deployment steps.
 
 A GitHub Actions workflow (`.github/workflows/deploy.yml`) builds and deploys to
 GitHub Pages on every push to `main` → `https://<user>.github.io/quotify/`.
+
+## Telegram lead bot
+
+The optional Telegram connector is backed by Supabase Edge Functions, so its bot
+token never reaches the browser or Cloudflare Worker. See
+[TELEGRAM_SETUP.md](TELEGRAM_SETUP.md) for the one-time setup and security model.

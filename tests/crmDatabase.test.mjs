@@ -55,6 +55,7 @@ before(async () => {
     "0006_crm_workflows",
     "0008_crm_queries",
     "0009_crm_email_history",
+    "0010_telegram_lead_inbox",
   ]) {
     const sql = await readFile(
       new URL(`../supabase/migrations/${name}.sql`, import.meta.url),

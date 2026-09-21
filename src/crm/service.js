@@ -174,6 +174,23 @@ export const archiveRecords = (entity, orgId, ids) =>
       .in("id", ids)
       .select("id"),
   );
+export const getTelegramIntegration = (orgId) =>
+  unwrap(
+    client()
+      .from("crm_telegram_integration")
+      .select("org_id,bot_username,webhook_url,connected_at,last_error,updated_at")
+      .eq("org_id", orgId)
+      .maybeSingle(),
+  );
+export async function connectTelegram(orgId) {
+  const { data, error } = await client().functions.invoke("telegram-setup", {
+    body: { orgId },
+  });
+  if (error)
+    throw new Error(data?.error || error.message || "Telegram setup failed.");
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
 export const saveWorkflow = (orgId, payload, id) =>
   unwrap(
     id

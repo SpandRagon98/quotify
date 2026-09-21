@@ -16,6 +16,12 @@ export const CONNECTORS = [
     description:
       "The crm_ingest RPC accepts workspace-authorized requests. A public website gateway needs server-side authentication and rate limiting.",
   },
+  {
+    id: "Telegram",
+    status: "Ready to connect",
+    description:
+      "Guided bot enquiries flow securely into Lead Inbox for review and conversion.",
+  },
   ...[
     "IndiaMART",
     "TradeIndia",

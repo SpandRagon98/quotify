@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Modal from "../components/common/Modal";
 import RecordList from "./RecordList";
 import { parseCsv } from "./csv";
 import { CONNECTORS, INBOX_MAPPING_FIELDS, mapIncoming } from "./adapters";
-import { rpc } from "./service";
+import { connectTelegram, getTelegramIntegration, rpc } from "./service";
 export default function LeadInbox({ env, go }) {
   const [csv, setCsv] = useState(null);
   const [mapping, setMapping] = useState({});
@@ -12,6 +12,48 @@ export default function LeadInbox({ env, go }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
+  const [telegram, setTelegram] = useState(null);
+  const [telegramBusy, setTelegramBusy] = useState(false);
+  const [telegramError, setTelegramError] = useState("");
+  const loadTelegram = useCallback(
+    () =>
+      getTelegramIntegration(env.user.orgId)
+        .then(setTelegram)
+        .catch((requestError) => setTelegramError(requestError.message)),
+    [env.user.orgId],
+  );
+  useEffect(() => {
+    loadTelegram();
+  }, [loadTelegram]);
+  const configureTelegram = async () => {
+    setTelegramBusy(true);
+    setTelegramError("");
+    try {
+      const result = await connectTelegram(env.user.orgId);
+      setTelegram({
+        org_id: env.user.orgId,
+        bot_username: result.botUsername || "",
+        webhook_url: result.webhookUrl || "",
+        connected_at: result.connected ? new Date().toISOString() : null,
+        last_error: result.lastError || "",
+      });
+    } catch (requestError) {
+      setTelegramError(requestError.message);
+      loadTelegram();
+    } finally {
+      setTelegramBusy(false);
+    }
+  };
+  const connectors = CONNECTORS.map((connector) =>
+    connector.id !== "Telegram"
+      ? connector
+      : {
+          ...connector,
+          status: telegram?.connected_at
+            ? `Connected${telegram.bot_username ? ` · @${telegram.bot_username}` : ""}`
+            : "Ready to connect",
+        },
+  );
   const selectFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -82,13 +124,59 @@ export default function LeadInbox({ env, go }) {
         <div className="card">
           <h3 className="card-title">Lead sources</h3>
           <div className="crm-connectors">
-            {CONNECTORS.map((c) => (
+            {connectors.map((c) => (
               <div key={c.id}>
                 <strong>{c.id}</strong>
                 <small>{c.status}</small>
                 <p>{c.description}</p>
               </div>
             ))}
+          </div>
+          <div className="telegram-connector-card">
+            <div>
+              <strong>Telegram lead bot</strong>
+              <p>
+                Collects a name, business, contact detail and requirement, then
+                sends the enquiry to this workspace’s Lead Inbox.
+              </p>
+              {telegram?.last_error && (
+                <small className="telegram-connector-error">
+                  {telegram.last_error}
+                </small>
+              )}
+              {telegramError && (
+                <small className="telegram-connector-error">
+                  {telegramError}
+                </small>
+              )}
+            </div>
+            <div className="telegram-connector-actions">
+              {telegram?.bot_username && (
+                <a
+                  className="btn btn-soft"
+                  href={`https://t.me/${telegram.bot_username}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open bot
+                </a>
+              )}
+              {env.access.settings?.manage_all ? (
+                <button
+                  className="btn btn-primary"
+                  disabled={telegramBusy}
+                  onClick={configureTelegram}
+                >
+                  {telegramBusy
+                    ? "Connecting…"
+                    : telegram?.connected_at
+                      ? "Reconnect Telegram"
+                      : "Connect Telegram"}
+                </button>
+              ) : (
+                <small>Ask a workspace owner or admin to connect the bot.</small>
+              )}
+            </div>
           </div>
           {env.access.inbox?.create && (
             <label className="btn btn-soft">

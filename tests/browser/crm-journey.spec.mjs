@@ -232,8 +232,9 @@ test("workflows create activities and disabled rules remain inactive through the
     ).toBeVisible();
     await nav(page, "Leads").click();
     await page.getByRole("button", { name: "New lead" }).click();
-    await dialog.getByLabel("Lead name").fill("Workflow browser enquiry");
-    await dialog.getByRole("button", { name: "Save", exact: true }).click();
+    await dialog.getByLabel("Name").fill("Workflow browser enquiry");
+    await dialog.getByLabel("Company").fill("Workflow test company");
+    await dialog.getByRole("button", { name: "Create lead", exact: true }).click();
     await nav(page, "Activities").click();
     await page.getByLabel("Activity view").selectOption("All");
     await expect(
@@ -244,8 +245,9 @@ test("workflows create activities and disabled rules remain inactive through the
     await expect(page.getByText("Disabled", { exact: true })).toBeVisible();
     await nav(page, "Leads").click();
     await page.getByRole("button", { name: "New lead" }).click();
-    await dialog.getByLabel("Lead name").fill("Disabled workflow enquiry");
-    await dialog.getByRole("button", { name: "Save", exact: true }).click();
+    await dialog.getByLabel("Name").fill("Disabled workflow enquiry");
+    await dialog.getByLabel("Company").fill("Disabled workflow company");
+    await dialog.getByRole("button", { name: "Create lead", exact: true }).click();
     expect(
       Number(
         (

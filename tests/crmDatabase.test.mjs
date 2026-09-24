@@ -56,6 +56,7 @@ before(async () => {
     "0008_crm_queries",
     "0009_crm_email_history",
     "0010_telegram_lead_inbox",
+    "0011_lead_form_configuration",
   ]) {
     const sql = await readFile(
       new URL(`../supabase/migrations/${name}.sql`, import.meta.url),
@@ -193,6 +194,48 @@ test("lead CRUD, indexed search, filters and atomic idempotent conversion", asyn
         ])
       )[0].n,
       1,
+    );
+  });
+});
+test("lead form configuration is workspace-scoped and custom lead values remain structured", async () => {
+  const fields = [
+    {
+      id: "custom_sector",
+      key: "custom_sector",
+      kind: "custom",
+      label: "Sector",
+      type: "select",
+      options: ["Retail", "SaaS"],
+      required: true,
+    },
+  ];
+  await as(admin, async () => {
+    await q(
+      "insert into crm_lead_form_configs(org_id,fields) values($1,$2) returning fields",
+      [org, JSON.stringify(fields)],
+    );
+    const created = (
+      await q(
+        "insert into crm_leads(org_id,owner_id,name,company_name,custom_fields) values($1,$2,'Configured enquiry','Form company',$3) returning custom_fields",
+        [org, admin, JSON.stringify({ custom_sector: "SaaS" })],
+      )
+    )[0];
+    assert.equal(created.custom_fields.custom_sector, "SaaS");
+  });
+  await as(viewer, async () => {
+    assert.equal(
+      (await q("select fields from crm_lead_form_configs where org_id=$1", [org]))[0]
+        .fields[0].label,
+      "Sector",
+    );
+    assert.equal(
+      (
+        await q(
+          "update crm_lead_form_configs set fields='[]'::jsonb where org_id=$1 returning org_id",
+          [org],
+        )
+      ).length,
+      0,
     );
   });
 });

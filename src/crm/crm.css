@@ -162,6 +162,7 @@
 }
 .crm-toolbar,
 .crm-tab-actions,
+.crm-lead-actions,
 .crm-form-actions,
 .crm-bulk,
 .crm-pagination,
@@ -171,6 +172,63 @@
   gap: 10px;
   flex-wrap: wrap;
   margin: 16px 0;
+}
+.crm-lead-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.lead-fixed-fields {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.lead-fixed-fields span {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--surface-soft);
+}
+.lead-fixed-fields strong {
+  margin-left: 6px;
+  color: var(--accent);
+  font-size: 12px;
+}
+.lead-form-builder {
+  display: grid;
+  gap: 12px;
+}
+.lead-form-builder-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(145px, 0.8fr) max-content 34px;
+  align-items: end;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+.lead-form-builder-row .crm-check {
+  margin: 0 0 8px;
+  white-space: nowrap;
+}
+.lead-field-kind {
+  padding: 10px 0;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+.lead-field-options {
+  grid-column: 1 / -1;
+}
+.lead-add-standard {
+  min-width: 230px;
+}
+@media (max-width: 700px) {
+  .crm-lead-actions { justify-content: flex-start; }
+  .lead-form-builder-row { grid-template-columns: 1fr; }
+  .lead-form-builder-row .crm-check { margin-bottom: 0; }
 }
 .crm-toolbar > .control,
 .crm-toolbar > label {

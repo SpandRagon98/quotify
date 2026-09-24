@@ -149,6 +149,33 @@ export const getRecord = (entity, orgId, id) =>
       .is("archived_at", null)
       .single(),
   );
+export const getLeadFormConfig = (orgId) =>
+  unwrap(
+    client()
+      .from("crm_lead_form_configs")
+      .select("fields,updated_at")
+      .eq("org_id", orgId)
+      .maybeSingle(),
+  );
+export const saveLeadFormConfig = (orgId, fields) =>
+  unwrap(
+    client()
+      .from("crm_lead_form_configs")
+      .upsert({ org_id: orgId, fields }, { onConflict: "org_id" })
+      .select("fields,updated_at")
+      .single(),
+  );
+export const findAccountByName = (orgId, name) =>
+  unwrap(
+    client()
+      .from("crm_accounts")
+      .select("id,name")
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .ilike("name", String(name || "").trim())
+      .limit(1)
+      .maybeSingle(),
+  );
 export const saveRecord = (entity, orgId, payload, id) =>
   unwrap(
     id

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import RecordFilters from "./RecordFilters";
 import {
   Plus,
@@ -10,10 +10,24 @@ import {
   Calendar,
 } from "lucide-react";
 import { ENTITIES, labelFor, money, activityStatus } from "./schema";
-import { archiveRecords, rpc, saveRecord } from "./service";
+import {
+  archiveRecords,
+  getLeadFormConfig,
+  rpc,
+  saveLeadFormConfig,
+  saveRecord,
+} from "./service";
 import { useRecords } from "./useRecords";
 import RecordForm from "./RecordForm";
 import { downloadCsv } from "./csv";
+import LeadFormConfigurator, { LeadCreateForm } from "./LeadFormConfigurator";
+import { defaultLeadFormFields } from "./leadForm";
+import {
+  downloadLeadExcelTemplate,
+  importLeadRows,
+  readLeadExcel,
+} from "./leadExcel";
+import Modal from "../components/common/Modal";
 export function Badge({ children }) {
   return (
     <span
@@ -75,6 +89,13 @@ export default function RecordList({
   const [selected, setSelected] = useState([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [leadConfig, setLeadConfig] = useState(defaultLeadFormFields);
+  const [leadConfigOpen, setLeadConfigOpen] = useState(false);
+  const [leadCreateOpen, setLeadCreateOpen] = useState(false);
+  const [leadImport, setLeadImport] = useState(null);
+  const [leadImportBusy, setLeadImportBusy] = useState(false);
+  const [leadImportProgress, setLeadImportProgress] = useState("");
+  const leadFileRef = useRef(null);
   const data = useRecords(entity, env.user.orgId, {
     page,
     query,
@@ -83,6 +104,20 @@ export default function RecordList({
     ascending,
     related,
   });
+  useEffect(() => {
+    if (entity !== "leads") return undefined;
+    let active = true;
+    getLeadFormConfig(env.user.orgId)
+      .then((config) => {
+        if (active && config?.fields) setLeadConfig(config.fields);
+      })
+      .catch((requestError) => {
+        if (active) setError(`Lead form configuration could not be loaded: ${requestError.message}`);
+      });
+    return () => {
+      active = false;
+    };
+  }, [entity, env.user.orgId]);
   const filter = (key, value) => {
     setPage(0);
     setSelected([]);
@@ -129,6 +164,54 @@ export default function RecordList({
               : { account_id: row.account_id, contact_id: row.id }),
       },
     });
+  const openLeadFile = () => leadFileRef.current?.click();
+  const chooseLeadFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setError("");
+    try {
+      if (file.size > 5 * 1024 * 1024)
+        throw new Error("Choose an Excel file smaller than 5 MB.");
+      setLeadImport(await readLeadExcel(file, leadConfig));
+      setLeadImportProgress("");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  };
+  const runLeadImport = async () => {
+    if (!leadImport || leadImport.errors.length) return;
+    setLeadImportBusy(true);
+    setLeadImportProgress("");
+    try {
+      const result = await importLeadRows(
+        leadImport.rows,
+        leadConfig,
+        env,
+        (current, total) => setLeadImportProgress(`${current} of ${total} rows processed`),
+      );
+      const detail = [
+        `${result.created} created`,
+        `${result.updated} updated`,
+        `${result.accepted} accepted`,
+        `${result.rejected} rejected`,
+        `${result.inProgress} marked in progress`,
+      ].join(" · ");
+      if (result.errors.length) {
+        setLeadImport({ ...leadImport, errors: result.errors });
+        setLeadImportProgress(`${detail}. Fix the listed rows and import them again.`);
+      } else {
+        setLeadImport(null);
+        setLeadImportProgress(`${detail}.`);
+        data.reload();
+        env.refresh?.();
+      }
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLeadImportBusy(false);
+    }
+  };
   const table = (
     <>
       <RecordFilters
@@ -409,15 +492,44 @@ export default function RecordList({
                 : "Workspace records, filtered securely on the server."}
             </p>
           </div>
-          {cap.create && entity !== "quote_links" && (
-            <button
-              className="btn btn-primary"
-              onClick={() => setForm({ entity, record: initialRecord })}
-            >
-              <Plus size={16} />
-              New {definition.singular.toLowerCase()}
-            </button>
-          )}
+          <div className="crm-lead-actions">
+            {entity === "leads" && cap.view && (
+              <>
+                <button
+                  className="btn btn-soft"
+                  disabled={busy}
+                  onClick={() =>
+                    downloadLeadExcelTemplate(leadConfig).catch((requestError) =>
+                      setError(`Excel template could not be created: ${requestError.message}`),
+                    )
+                  }
+                >
+                  <Download size={16} />
+                  Download Excel template
+                </button>
+                {cap.create && cap.edit && (
+                  <button className="btn btn-soft" disabled={busy} onClick={openLeadFile}>
+                    Import Excel
+                  </button>
+                )}
+                {cap.edit && (
+                  <button className="btn btn-soft" disabled={busy} onClick={() => setLeadConfigOpen(true)}>
+                    Configure
+                  </button>
+                )}
+                <input ref={leadFileRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={chooseLeadFile} />
+              </>
+            )}
+            {cap.create && entity !== "quote_links" && (
+              <button
+                className="btn btn-primary"
+                onClick={() => entity === "leads" ? setLeadCreateOpen(true) : setForm({ entity, record: initialRecord })}
+              >
+                <Plus size={16} />
+                New {definition.singular.toLowerCase()}
+              </button>
+            )}
+          </div>
         </header>
       )}
       {embedded && (
@@ -454,6 +566,51 @@ export default function RecordList({
             env.refresh?.();
           }}
         />
+      )}
+      {leadCreateOpen && (
+        <LeadCreateForm
+          config={leadConfig}
+          env={env}
+          onClose={() => setLeadCreateOpen(false)}
+          onSaved={() => {
+            setLeadCreateOpen(false);
+            data.reload();
+            env.refresh?.();
+          }}
+        />
+      )}
+      {leadConfigOpen && (
+        <LeadFormConfigurator
+          config={leadConfig}
+          onClose={() => setLeadConfigOpen(false)}
+          onSave={async (fields) => {
+            const saved = await saveLeadFormConfig(env.user.orgId, fields);
+            setLeadConfig(saved.fields);
+            setLeadConfigOpen(false);
+          }}
+        />
+      )}
+      {leadImport && (
+        <Modal
+          open
+          wide
+          title="Review Excel lead import"
+          onClose={() => !leadImportBusy && setLeadImport(null)}
+          footer={
+            <>
+              <button className="btn btn-soft" disabled={leadImportBusy} onClick={() => setLeadImport(null)}>Cancel</button>
+              <button className="btn btn-primary" disabled={leadImportBusy || leadImport.errors.length > 0} onClick={runLeadImport}>
+                {leadImportBusy ? "Importing…" : "Apply lead updates"}
+              </button>
+            </>
+          }
+        >
+          <p>{leadImport.rows.length} row(s) are ready. Accepted leads create or reuse an account, create the contact, and create an opportunity.</p>
+          {leadImportProgress && <div className="alert alert-info">{leadImportProgress}</div>}
+          {leadImport.errors.length > 0 ? (
+            <div className="alert alert-error" role="alert"><strong>Fix these rows before applying the import:</strong><ul>{leadImport.errors.map((item) => <li key={item}>{item}</li>)}</ul></div>
+          ) : <div className="alert alert-info">Only filled cells update an existing lead. Leave Lead ID blank to create a new one.</div>}
+        </Modal>
       )}
     </div>
   );

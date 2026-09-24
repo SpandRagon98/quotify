@@ -43,6 +43,7 @@ export async function databaseFixture(page, { role = "owner" } = {}) {
     "0008_crm_queries",
     "0009_crm_email_history",
     "0010_telegram_lead_inbox",
+    "0011_lead_form_configuration",
   ]) {
     await db.exec(
       (

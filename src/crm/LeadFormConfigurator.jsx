@@ -74,6 +74,12 @@ export function LeadCreateForm({ config, pricing, env, onClose, onSaved }) {
       const payload = leadPayload(values, config);
       if (!payload.name || !payload.company_name)
         throw new Error("Name and company are required.");
+      const missingField = fields.find((field) => field.required && (
+        field.type === "multiselect"
+          ? !Array.isArray(values[field.key]) || values[field.key].length === 0
+          : values[field.key] == null || String(values[field.key]).trim() === ""
+      ));
+      if (missingField) throw new Error(`${missingField.label} is required.`);
       if (estimate) {
         payload.custom_fields = {
           ...payload.custom_fields,

@@ -243,6 +243,24 @@ export default function RecordDetail({
             : "No primary contact selected"}
         </p>
       )}
+      {entity === "leads" && (
+        <div className="lead-score-summary card">
+          <div>
+            <small>Lead score</small>
+            <strong>{record.lead_score ?? 0}<span>/100</span></strong>
+          </div>
+          <div>
+            <small>Priority band</small>
+            <Badge>{record.lead_temperature || "Nurture"}</Badge>
+          </div>
+          <div className="lead-score-reasons">
+            <small>Why this score</small>
+            {record.lead_score_reasons?.length ? (
+              <ul>{record.lead_score_reasons.map((reason) => <li key={reason.label}>{reason.label} <strong>+{reason.points}</strong></li>)}</ul>
+            ) : <span>Add contact, project, and timeline details to make this lead easier to prioritise.</span>}
+          </div>
+        </div>
+      )}
       {summary && (
         <div className="crm-kpis">
           {[

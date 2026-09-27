@@ -57,6 +57,8 @@ before(async () => {
     "0009_crm_email_history",
     "0010_telegram_lead_inbox",
     "0011_lead_form_configuration",
+    "0012_interior_lead_questionnaire",
+    "0013_lead_scoring",
   ]) {
     const sql = await readFile(
       new URL(`../supabase/migrations/${name}.sql`, import.meta.url),
@@ -237,6 +239,38 @@ test("lead form configuration is workspace-scoped and custom lead values remain 
       ).length,
       0,
     );
+  });
+});
+test("lead scores are calculated on the server and update when readiness changes", async () => {
+  await as(admin, async () => {
+    const qualified = (await q(
+      `insert into crm_leads(org_id,owner_id,name,company_name,email,phone,source,estimated_value,priority,status,custom_fields)
+       values($1,$2,'Ready interior lead','Test Homes','ready@test.invalid','+91 9000000000','Website · Interior questionnaire',1200000,'High','Qualified',$3)
+       returning lead_score,lead_temperature,lead_score_reasons`,
+      [org, admin, JSON.stringify({
+        custom_locality: 'Indiranagar',
+        custom_possession_status: 'Possession received',
+        custom_timeline: 'Immediately',
+        custom_budget_range: '₹20–35 lakh',
+        custom_carpet_area_sqft: 1200,
+        custom_spaces: ['Full Home'],
+      })],
+    ))[0];
+    assert.equal(qualified.lead_temperature, 'Hot');
+    assert.ok(qualified.lead_score >= 70);
+    assert.ok(qualified.lead_score_reasons.some((reason) => reason.label === 'Immediate timeline'));
+
+    const nurtured = (await q(
+      "insert into crm_leads(org_id,owner_id,name) values($1,$2,'Early enquiry') returning id,lead_score,lead_temperature",
+      [org, admin],
+    ))[0];
+    assert.equal(nurtured.lead_temperature, 'Nurture');
+    const updated = (await q(
+      "update crm_leads set phone='+91 9000000001', status='Contacted', priority='High' where id=$1 returning lead_score,lead_temperature",
+      [nurtured.id],
+    ))[0];
+    assert.ok(updated.lead_score > nurtured.lead_score);
+    assert.equal(updated.lead_temperature, 'Nurture');
   });
 });
 test("multiple contacts, server stage probabilities and Won/Lost validation", async () => {

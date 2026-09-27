@@ -67,6 +67,8 @@ export const ENTITIES = {
     label: "name",
     columns: [
       "name",
+      "lead_score",
+      "lead_temperature",
       "company_name",
       "owner_id",
       "status",

@@ -49,6 +49,9 @@ export function Cell({ entity, row, column, env }) {
     );
   if (column === "stage" || column === "priority")
     return <Badge>{value}</Badge>;
+  if (column === "lead_temperature") return <Badge>{value}</Badge>;
+  if (column === "lead_score")
+    return <span className="lead-score" title="Calculated automatically from lead readiness and details">{Number(value || 0)}<small>/100</small></span>;
   if (column === "amount" || column === "estimated_value")
     return money(value, row.currency || "INR");
   if (column.endsWith("_at") || column === "expected_close_date")

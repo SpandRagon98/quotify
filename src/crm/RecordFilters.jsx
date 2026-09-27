@@ -47,17 +47,30 @@ export default function RecordFilters({
           ))}
         </select>
         {entity === "leads" && (
-          <select
-            className="control"
-            aria-label="Status filter"
-            value={filters.status || ""}
-            onChange={(e) => filter("status", e.target.value)}
-          >
-            <option value="">All statuses</option>
-            {LEAD_STATUSES.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
+          <>
+            <select
+              className="control"
+              aria-label="Status filter"
+              value={filters.status || ""}
+              onChange={(e) => filter("status", e.target.value)}
+            >
+              <option value="">All statuses</option>
+              {LEAD_STATUSES.map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+            <select
+              className="control"
+              aria-label="Lead score filter"
+              value={filters.lead_temperature || ""}
+              onChange={(e) => filter("lead_temperature", e.target.value)}
+            >
+              <option value="">All lead scores</option>
+              <option value="Hot">Hot (70–100)</option>
+              <option value="Warm">Warm (40–69)</option>
+              <option value="Nurture">Nurture (0–39)</option>
+            </select>
+          </>
         )}
         {entity === "opportunities" && (
           <select

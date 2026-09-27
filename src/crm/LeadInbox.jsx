@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { Copy, Globe2 } from "lucide-react";
 import Modal from "../components/common/Modal";
 import RecordList from "./RecordList";
 import { parseCsv } from "./csv";
 import { CONNECTORS, INBOX_MAPPING_FIELDS, mapIncoming } from "./adapters";
-import { connectTelegram, getTelegramIntegration, rpc } from "./service";
+import { connectTelegram, getTelegramIntegration, getWebsiteLeadForm, rpc, saveWebsiteLeadForm } from "./service";
 export default function LeadInbox({ env, go }) {
   const [csv, setCsv] = useState(null);
   const [mapping, setMapping] = useState({});
@@ -15,6 +16,10 @@ export default function LeadInbox({ env, go }) {
   const [telegram, setTelegram] = useState(null);
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [telegramError, setTelegramError] = useState("");
+  const [websiteForm, setWebsiteForm] = useState(null);
+  const [websiteOrigin, setWebsiteOrigin] = useState("");
+  const [websiteBusy, setWebsiteBusy] = useState(false);
+  const [websiteError, setWebsiteError] = useState("");
   const loadTelegram = useCallback(
     () =>
       getTelegramIntegration(env.user.orgId)
@@ -25,6 +30,44 @@ export default function LeadInbox({ env, go }) {
   useEffect(() => {
     loadTelegram();
   }, [loadTelegram]);
+  useEffect(() => {
+    let active = true;
+    getWebsiteLeadForm(env.user.orgId)
+      .then((form) => {
+        if (!active) return;
+        setWebsiteForm(form);
+        setWebsiteOrigin(form?.allowed_origins?.[0] || "");
+      })
+      .catch((requestError) => active && setWebsiteError(requestError.message));
+    return () => { active = false; };
+  }, [env.user.orgId]);
+  const saveWebsite = async () => {
+    const origin = websiteOrigin.trim().replace(/\/$/, "");
+    if (!/^https:\/\/[a-z0-9.-]+(?::\d+)?$/i.test(origin)) {
+      setWebsiteError("Enter the exact HTTPS website origin, for example https://yourname.github.io.");
+      return;
+    }
+    setWebsiteBusy(true);
+    setWebsiteError("");
+    try {
+      const saved = await saveWebsiteLeadForm(env.user.orgId, {
+        name: "Interior website questionnaire",
+        allowed_origins: [origin],
+        active: true,
+      });
+      setWebsiteForm(saved);
+    } catch (requestError) {
+      setWebsiteError(requestError.message);
+    } finally {
+      setWebsiteBusy(false);
+    }
+  };
+  const copyWebsiteConfig = async () => {
+    if (!websiteForm) return;
+    const text = JSON.stringify({ endpoint: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/website-lead`, formId: websiteForm.id }, null, 2);
+    try { await navigator.clipboard.writeText(text); setProgress("Website connection details copied."); }
+    catch { setWebsiteError("Copy was blocked. Select the connection details and copy them manually."); }
+  };
   const configureTelegram = async () => {
     setTelegramBusy(true);
     setTelegramError("");
@@ -176,6 +219,19 @@ export default function LeadInbox({ env, go }) {
               ) : (
                 <small>Ask a workspace owner or admin to connect the bot.</small>
               )}
+            </div>
+          </div>
+          <div className="telegram-connector-card website-questionnaire-card">
+            <div>
+              <strong><Globe2 size={17} /> Interior website questionnaire</strong>
+              <p>Accept residential project briefs from your website and create a Qyrova lead directly with the estimated range and every answer attached.</p>
+              {websiteForm && <small>Active for {websiteForm.allowed_origins.join(", ")}</small>}
+              {websiteError && <small className="telegram-connector-error">{websiteError}</small>}
+            </div>
+            <div className="website-questionnaire-actions">
+              <input className="control" aria-label="Website origin" placeholder="https://yourname.github.io" value={websiteOrigin} onChange={(event) => setWebsiteOrigin(event.target.value)} disabled={!env.access.settings?.manage_all} />
+              {env.access.settings?.manage_all ? <button className="btn btn-primary" disabled={websiteBusy} onClick={saveWebsite}>{websiteBusy ? "Saving…" : websiteForm ? "Update website" : "Enable website"}</button> : <small>Ask a workspace owner or admin to enable this connection.</small>}
+              {websiteForm && <button className="btn btn-soft" onClick={copyWebsiteConfig}><Copy size={15} />Copy connection</button>}
             </div>
           </div>
           {env.access.inbox?.create && (

@@ -22,6 +22,7 @@ import RecordForm from "./RecordForm";
 import { downloadCsv } from "./csv";
 import LeadFormConfigurator, { LeadCreateForm } from "./LeadFormConfigurator";
 import { defaultLeadFormFields } from "./leadForm";
+import { DEFAULT_INTERIOR_PRICING } from "./interiorProject";
 import {
   downloadLeadExcelTemplate,
   importLeadRows,
@@ -90,6 +91,7 @@ export default function RecordList({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [leadConfig, setLeadConfig] = useState(defaultLeadFormFields);
+  const [leadPricing, setLeadPricing] = useState(DEFAULT_INTERIOR_PRICING);
   const [leadConfigOpen, setLeadConfigOpen] = useState(false);
   const [leadCreateOpen, setLeadCreateOpen] = useState(false);
   const [leadImport, setLeadImport] = useState(null);
@@ -109,7 +111,10 @@ export default function RecordList({
     let active = true;
     getLeadFormConfig(env.user.orgId)
       .then((config) => {
-        if (active && config?.fields) setLeadConfig(config.fields);
+        if (active && config?.fields) {
+          setLeadConfig(config.fields);
+          if (config.interior_pricing) setLeadPricing(config.interior_pricing);
+        }
       })
       .catch((requestError) => {
         if (active) setError(`Lead form configuration could not be loaded: ${requestError.message}`);
@@ -570,6 +575,7 @@ export default function RecordList({
       {leadCreateOpen && (
         <LeadCreateForm
           config={leadConfig}
+          pricing={leadPricing}
           env={env}
           onClose={() => setLeadCreateOpen(false)}
           onSaved={() => {
@@ -582,10 +588,12 @@ export default function RecordList({
       {leadConfigOpen && (
         <LeadFormConfigurator
           config={leadConfig}
+          pricing={leadPricing}
           onClose={() => setLeadConfigOpen(false)}
-          onSave={async (fields) => {
-            const saved = await saveLeadFormConfig(env.user.orgId, fields);
+          onSave={async (fields, pricing) => {
+            const saved = await saveLeadFormConfig(env.user.orgId, fields, pricing);
             setLeadConfig(saved.fields);
+            setLeadPricing(saved.interior_pricing || DEFAULT_INTERIOR_PRICING);
             setLeadConfigOpen(false);
           }}
         />

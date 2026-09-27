@@ -584,6 +584,23 @@
 .telegram-connector-card strong { display: block; margin-bottom: 4px; }
 .telegram-connector-card p { margin: 0; color: var(--muted); max-width: 620px; }
 .telegram-connector-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.website-questionnaire-card strong { display: inline-flex; align-items: center; gap: 7px; }
+.website-questionnaire-actions { display: grid; grid-template-columns: minmax(230px, 1fr) auto auto; align-items: center; gap: 8px; width: min(100%, 590px); }
+.lead-multiselect { display: flex; flex-wrap: wrap; gap: 8px; }
+.lead-multiselect label { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; padding: 7px 10px; font-size: 12px; cursor: pointer; }
+.lead-multiselect input { accent-color: var(--accent); }
+.interior-template-callout { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin: 18px 0; padding: 15px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); border-radius: 12px; background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
+.interior-template-callout > div { display: flex; align-items: flex-start; gap: 10px; }
+.interior-template-callout strong, .interior-template-callout small { display: block; }
+.interior-template-callout small { margin-top: 4px; color: var(--muted); max-width: 620px; }
+.interior-pricing-settings { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 16px; }
+.interior-pricing-settings summary { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 650; }
+.interior-pricing-settings > p { color: var(--muted); font-size: 12px; max-width: 700px; }
+.interior-rate-row { display: grid; grid-template-columns: 120px repeat(2, minmax(0, 1fr)); gap: 10px; align-items: end; }
+.interior-rate-row strong { padding-bottom: 12px; }
+.interior-estimate-preview { grid-column: 1 / -1; display: grid; gap: 4px; margin-top: 4px; padding: 16px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 8%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border)); }
+.interior-estimate-preview span, .interior-estimate-preview small { color: var(--muted); font-size: 12px; }
+.interior-estimate-preview strong { font-size: 20px; }
 .telegram-connector-error { display: block; margin-top: 8px; color: var(--danger); }
 .crm-inbox-intro {
   padding-bottom: 0 !important;
@@ -594,6 +611,7 @@
 @media (max-width: 700px) {
   .telegram-connector-card,
   .telegram-connector-actions { align-items: stretch; flex-direction: column; }
+  .website-questionnaire-actions { grid-template-columns: 1fr; width: 100%; }
   .telegram-connector-actions .btn { justify-content: center; }
 }
 .crm-relation {
@@ -660,4 +678,7 @@
   .crm-lane {
     flex-basis: 245px;
   }
+  .interior-template-callout { align-items: stretch; flex-direction: column; }
+  .interior-rate-row { grid-template-columns: 1fr; }
+  .interior-rate-row strong { padding-bottom: 0; }
 }

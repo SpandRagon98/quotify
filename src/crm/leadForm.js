@@ -79,7 +79,7 @@ export function normalizeLeadFormFields(value) {
       key,
       kind,
       label: fieldLabel,
-      type: ["text", "email", "tel", "number", "date", "datetime-local", "textarea", "select"].includes(type)
+      type: ["text", "email", "tel", "number", "date", "datetime-local", "textarea", "select", "multiselect"].includes(type)
         ? type
         : "text",
       options: Array.isArray(item?.options)
@@ -96,6 +96,10 @@ export function leadFormFields(config) {
 
 export function leadValue(value, field) {
   if (value === "" || value == null) return null;
+  if (field.type === "multiselect") {
+    const values = Array.isArray(value) ? value : String(value).split(",");
+    return values.map((item) => String(item).trim()).filter(Boolean).slice(0, 30);
+  }
   if (field.type === "number") {
     const number = Number(value);
     if (!Number.isFinite(number)) throw new Error(`${field.label} must be a number.`);
@@ -126,7 +130,7 @@ export function validateLeadFormConfig(config) {
       throw new Error("Each field label must be between 1 and 80 characters.");
     if (field.kind === "custom" && !/^custom_[a-z0-9_]+$/i.test(field.key))
       throw new Error("A custom field has an invalid internal name. Remove and add it again.");
-    if (field.type === "select" && field.options.length === 0)
+    if (["select", "multiselect"].includes(field.type) && field.options.length === 0)
       throw new Error(`${field.label} needs at least one dropdown option.`);
   }
   return fields;

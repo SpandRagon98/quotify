@@ -153,16 +153,32 @@ export const getLeadFormConfig = (orgId) =>
   unwrap(
     client()
       .from("crm_lead_form_configs")
-      .select("fields,updated_at")
+      .select("fields,interior_pricing,updated_at")
       .eq("org_id", orgId)
       .maybeSingle(),
   );
-export const saveLeadFormConfig = (orgId, fields) =>
+export const saveLeadFormConfig = (orgId, fields, interiorPricing) =>
   unwrap(
     client()
       .from("crm_lead_form_configs")
-      .upsert({ org_id: orgId, fields }, { onConflict: "org_id" })
-      .select("fields,updated_at")
+      .upsert({ org_id: orgId, fields, interior_pricing: interiorPricing }, { onConflict: "org_id" })
+      .select("fields,interior_pricing,updated_at")
+      .single(),
+  );
+export const getWebsiteLeadForm = (orgId) =>
+  unwrap(
+    client()
+      .from("crm_website_lead_forms")
+      .select("id,name,allowed_origins,active,updated_at")
+      .eq("org_id", orgId)
+      .maybeSingle(),
+  );
+export const saveWebsiteLeadForm = (orgId, payload) =>
+  unwrap(
+    client()
+      .from("crm_website_lead_forms")
+      .upsert({ org_id: orgId, ...payload }, { onConflict: "org_id" })
+      .select("id,name,allowed_origins,active,updated_at")
       .single(),
   );
 export const findAccountByName = (orgId, name) =>

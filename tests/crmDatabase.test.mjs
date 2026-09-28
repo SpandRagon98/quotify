@@ -60,6 +60,7 @@ before(async () => {
     "0012_interior_lead_questionnaire",
     "0013_lead_scoring",
     "0014_change_orders",
+    "0015_customer_lifecycle",
   ]) {
     const sql = await readFile(
       new URL(`../supabase/migrations/${name}.sql`, import.meta.url),
@@ -300,6 +301,42 @@ test("change orders preserve the approved scope and require the customer capabil
     await assert.rejects(q("update crm_change_orders set status='Rejected' where id=$1", [order.id]), /approval link|final/i);
   });
 });
+test("leads create B2B or personal customer records and archive dependent records safely", async () => {
+  await as(admin, async () => {
+    const personal = (await q(
+      "insert into crm_leads(org_id,owner_id,name,email) values($1,$2,'Priya Home','priya@test.invalid') returning id,account_id,contact_id",
+      [org, admin],
+    ))[0];
+    const personalLinked = (await q("select l.account_id,l.contact_id,a.account_type,a.name from crm_leads l join crm_accounts a on a.id=l.account_id where l.id=$1", [personal.id]))[0];
+    assert.equal(personalLinked.account_type, 'Personal');
+    assert.equal(personalLinked.name, 'Priya Home');
+    await q("update crm_contacts set archived_at=now() where id=$1", [personalLinked.contact_id]);
+    assert.equal((await q("select archived_at,contact_id from crm_leads where id=$1", [personal.id]))[0].archived_at, null);
+    assert.equal((await q("select contact_id from crm_leads where id=$1", [personal.id]))[0].contact_id, null);
+
+    const business = (await q(
+      "insert into crm_leads(org_id,owner_id,name,company_name,email,estimated_value) values($1,$2,'Ada Buyer','Analytical Interiors','ada-buyer@test.invalid',750000) returning id,account_id,contact_id",
+      [org, admin],
+    ))[0];
+    const businessLinked = (await q("select account_id,contact_id from crm_leads where id=$1", [business.id]))[0];
+    assert.equal((await q("select account_type from crm_accounts where id=$1", [businessLinked.account_id]))[0].account_type, 'Company');
+    await q("update crm_leads set status='Interested' where id=$1", [business.id]);
+    const interested = (await q("select opportunity_id from crm_leads where id=$1", [business.id]))[0];
+    assert.ok(interested.opportunity_id);
+    await q("update crm_leads set archived_at=now() where id=$1", [business.id]);
+    assert.notEqual((await q("select archived_at from crm_opportunities where id=$1", [interested.opportunity_id]))[0].archived_at, null);
+    assert.notEqual((await q("select archived_at from crm_contacts where id=$1", [businessLinked.contact_id]))[0].archived_at, null);
+    assert.notEqual((await q("select archived_at from crm_accounts where id=$1", [businessLinked.account_id]))[0].archived_at, null);
+
+    const accountCascade = (await q(
+      "insert into crm_leads(org_id,owner_id,name,company_name) values($1,$2,'Account cascade lead','Archive Test Co') returning id,account_id",
+      [org, admin],
+    ))[0];
+    const cascadeLinked = (await q("select account_id from crm_leads where id=$1", [accountCascade.id]))[0];
+    await q("update crm_accounts set archived_at=now() where id=$1", [cascadeLinked.account_id]);
+    assert.notEqual((await q("select archived_at from crm_leads where id=$1", [accountCascade.id]))[0].archived_at, null);
+  });
+});
 test("multiple contacts, server stage probabilities and Won/Lost validation", async () => {
   await as(admin, async () => {
     await q(
@@ -410,8 +447,8 @@ test("direct SQL/API authorization: anonymous, other workspace, Viewer, ownershi
   });
   await as(viewer, async () => {
     assert.equal(
-      (await q("select id from crm_accounts where org_id=$1", [org])).length,
-      1,
+      (await q("select id from crm_accounts where org_id=$1", [org])).length > 0,
+      true,
     );
     await assert.rejects(
       q(

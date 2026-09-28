@@ -72,8 +72,7 @@ export function LeadCreateForm({ config, pricing, env, onClose, onSaved }) {
     setError("");
     try {
       const payload = leadPayload(values, config);
-      if (!payload.name || !payload.company_name)
-        throw new Error("Name and company are required.");
+      if (!payload.name) throw new Error("Name is required.");
       const missingField = fields.find((field) => field.required && (
         field.type === "multiselect"
           ? !Array.isArray(values[field.key]) || values[field.key].length === 0
@@ -108,7 +107,7 @@ export function LeadCreateForm({ config, pricing, env, onClose, onSaved }) {
   return (
     <Modal open wide title="New lead" onClose={() => !busy && onClose()}>
       <form onSubmit={submit}>
-        <p className="form-hint">Fields marked with * are required for every lead.</p>
+        <p className="form-hint">Fields marked with * are required. A company creates a Company account; leaving it blank creates a Personal account.</p>
         <div className="crm-form-grid">
           {fields.map((field) => (
             <label key={field.id || field.key} className={`form-field ${field.type === "textarea" ? "crm-full" : ""}`}>
@@ -161,13 +160,13 @@ export default function LeadFormConfigurator({ config, pricing, onClose, onSave 
         </>
       }
     >
-      <p>Choose the fields your team sees when creating a lead. Name and Company stay required; all other fields can be changed or removed.</p>
+      <p>Choose the fields your team sees when creating a lead. Name stays required. A blank company creates a Personal customer account; a company name creates a Company account.</p>
       <div className="interior-template-callout">
         <div><Home size={18} /><span><strong>Interior project questionnaire</strong><small>Adds property, BHK, carpet area, locality, spaces, style, finish, budget and timeline—ready for residential enquiries.</small></span></div>
         <button type="button" className="btn btn-soft" onClick={() => setFields((old) => applyInteriorProjectTemplate(old))}>Use interior template</button>
       </div>
       <div className="lead-fixed-fields">
-        {FIXED_LEAD_FIELDS.map((field) => <span key={field.key}>{field.label} <strong>Required</strong></span>)}
+        {FIXED_LEAD_FIELDS.map((field) => <span key={field.key}>{field.label} {field.required && <strong>Required</strong>}</span>)}
       </div>
       <div className="lead-form-builder">
         {fields.map((field) => (

@@ -91,7 +91,7 @@ Deno.serve(async (request) => {
     const { error: requestError } = await db.from("crm_website_lead_requests").insert({ form_id: form.id, fingerprint: visitor });
     if (requestError) throw requestError;
     const { error: insertError } = await db.from("crm_leads").insert({
-      org_id: form.org_id, owner_id: organization.owner_id, name, company_name: text(contact.company, 160) || `Residential project · ${text(answers.locality, 100)}`,
+      org_id: form.org_id, owner_id: organization.owner_id, name, company_name: text(contact.company, 160) || null,
       email: email || null, phone: phone || null, source: "Website · Interior questionnaire", status: "New", stage: "Enquiry", priority: "Normal", city: text(answers.city, 100),
       product: "Interior design", website: sourceIdentifier, estimated_value: calculated.low,
       notes: text(answers.project_notes, 2_000), custom_fields: customFields,

@@ -494,6 +494,25 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.lead-journey { margin: 18px 0; padding: 20px 22px; }
+.lead-journey > div:first-child { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+.lead-journey-nodes { display: flex; gap: 0; margin: 16px 0; overflow-x: auto; }
+.lead-journey-nodes > div { display: grid; grid-template-columns: 22px minmax(100px, 1fr) 20px; column-gap: 7px; align-items: center; min-width: 170px; color: var(--muted); }
+.lead-journey-nodes > div > span { width: 22px; height: 22px; display: inline-grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; font-size: 11px; }
+.lead-journey-nodes strong { color: inherit; font-size: 13px; }
+.lead-journey-nodes small { grid-column: 2; font-size: 11px; }
+.lead-journey-nodes .is-complete { color: var(--accent); }
+.lead-journey-nodes .is-complete > span { background: var(--accent); color: white; border-color: var(--accent); }
+.lead-journey-arrow { grid-column: 3; grid-row: 1 / 3; color: var(--border); }
+.activity-gantt { margin-top: 18px; padding: 20px; }
+.activity-gantt-scroll { overflow-x: auto; margin-top: 16px; }
+.activity-gantt-grid { min-width: 840px; display: grid; position: relative; border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
+.activity-gantt-grid > * { min-height: 50px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 9px; }
+.activity-gantt-title, .activity-gantt-day { background: var(--surface-2, var(--surface)); font-size: 11px; color: var(--muted); font-weight: 650; }
+.activity-gantt-row { display: contents; }
+.activity-gantt-row > div:first-child { grid-column: 1; display: grid; gap: 4px; font-size: 12px; }
+.activity-gantt-row > div:first-child small { color: var(--muted); font-size: 10px; }
+.activity-gantt-bar { align-self: center; min-height: 30px !important; margin: 9px 5px; border: 0 !important; border-radius: 7px; background: var(--accent); color: white; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crm-tabs {
   display: flex;
   gap: 8px;

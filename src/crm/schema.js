@@ -2,6 +2,7 @@ export const LEAD_STATUSES = [
   "New",
   "Attempted Contact",
   "Contacted",
+  "Interested",
   "Qualified",
   "Unqualified",
   "Converted",
@@ -124,7 +125,7 @@ export const ENTITIES = {
       field("name", "Account name", "text", { required: true }),
       owner,
       field("account_type", "Type", "select", {
-        options: ["Prospect", "Customer", "Partner", "Other"],
+        options: ["Company", "Personal", "Prospect", "Customer", "Partner", "Other"],
         default: "Prospect",
       }),
       field("industry", "Industry"),
@@ -237,6 +238,7 @@ export const ENTITIES = {
         dependsOn: "account_id",
       }),
       field("due_at", "Due date and time", "datetime-local"),
+      field("duration_minutes", "Duration (minutes)", "number", { default: 60 }),
       field("reminder_at", "Reminder", "datetime-local"),
       field("status", "Status", "select", {
         options: ACTIVITY_STATUSES,

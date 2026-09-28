@@ -11,6 +11,8 @@ import DocumentPreview from "../components/common/DocumentPreview";
 import { useCompanyProfile } from "../hooks/useCompanyProfile";
 import { safeDocumentUrl } from "./helpers";
 const ChangeOrdersPanel = lazy(() => import("./ChangeOrdersPanel"));
+const ActivityGantt = lazy(() => import("./ActivityGantt"));
+const LeadJourney = lazy(() => import("./LeadJourney"));
 function LinkedDocument({ record, preset }) {
   const cfg = useCompanyProfile(record.preset_id);
   return (
@@ -144,7 +146,7 @@ export default function RecordDetail({
           "Notes",
         ]
       : entity === "opportunities"
-        ? ["Overview", "Activities", "Change orders", "Quotations", "Documents", "Notes"]
+        ? ["Overview", "Activities", "Schedule", "Change orders", "Quotations", "Documents", "Notes"]
         : ["Overview", "Activities", "Quotations", "Documents", "Notes"]
   ).filter(
     (name) =>
@@ -155,6 +157,8 @@ export default function RecordDetail({
           ? env.access.opportunities?.view
           : name === "Change orders"
             ? env.access.opportunities?.view
+          : name === "Schedule"
+            ? env.access.activities?.view
           : ["Activities", "Notes"].includes(name)
             ? env.access.activities?.view
             : env.access.quotations?.view),
@@ -207,12 +211,15 @@ export default function RecordDetail({
               Edit
             </button>
           )}
-          {entity === "leads" && cap.edit && !record.converted_at && (
+          {entity === "leads" && cap.edit && !record.opportunity_id && !record.converted_opportunity_id && (
             <button
               className="btn btn-primary"
-              onClick={() => setConvert(true)}
+              onClick={async () => {
+                try { await saveRecord("leads", env.user.orgId, { status: "Interested" }, record.id); reload(); }
+                catch (requestError) { setError(requestError.message); }
+              }}
             >
-              Convert lead
+              Mark interested
             </button>
           )}
           {accountId && entity !== "accounts" && (
@@ -267,6 +274,10 @@ export default function RecordDetail({
           </div>
         </div>
       )}
+      {entity === "leads" && <Suspense fallback={null}><LeadJourney lead={record} onMarkInterested={async () => {
+        try { await saveRecord("leads", env.user.orgId, { status: "Interested" }, record.id); reload(); }
+        catch (requestError) { setError(requestError.message); }
+      }} /></Suspense>}
       {summary && (
         <div className="crm-kpis">
           {[
@@ -477,6 +488,11 @@ export default function RecordDetail({
               embedded
               initialRecord={activityDefaults}
             />
+          )}
+          {tab === "Schedule" && entity === "opportunities" && (
+            <Suspense fallback={<div className="empty-inline">Opening activity schedule…</div>}>
+              <ActivityGantt env={env} opportunityId={id} />
+            </Suspense>
           )}
           {tab === "Change orders" && (
             <Suspense fallback={<div className="empty-inline">Opening change orders…</div>}>

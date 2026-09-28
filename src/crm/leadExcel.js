@@ -103,7 +103,7 @@ export async function downloadLeadExcelTemplate(config) {
   guide.columns = [{ width: 28 }, { width: 95 }];
   guide.addRows([
     ["Qyrova lead import", "Use the Leads sheet to add new leads or update an exported lead."],
-    ["New lead", "Leave Lead ID blank. Name and Company are required."],
+    ["New lead", "Leave Lead ID blank. Name is required. Leave Company blank for a Personal (B2C) account."],
     ["Update a lead", "Enter its Lead ID, change only the values you want to update, then choose a Lead status."],
     ["Accept", "Converts the lead: Qyrova reuses a same-named account when available, then creates the account/contact relationship and opportunity."],
     ["Reject", "Keeps the lead record and changes its CRM status to Unqualified."],
@@ -127,7 +127,7 @@ export async function readLeadExcel(file, config) {
   const expected = [LEAD_ID_HEADER, ...leadFormFields(config).map((field) => field.label), LEAD_STATUS_HEADER];
   const unknown = headers.filter((header) => header && !expected.includes(header));
   if (unknown.length) throw new Error(`This file has unrecognized column(s): ${unknown.join(", ")}. Download a fresh template after changing the form.`);
-  for (const header of [LEAD_ID_HEADER, "Name", "Company", LEAD_STATUS_HEADER])
+  for (const header of [LEAD_ID_HEADER, "Name", "Company (optional)", LEAD_STATUS_HEADER])
     if (!headers.includes(header)) throw new Error(`Missing required column: ${header}. Download a fresh template after changing the form.`);
   const headerIndex = Object.fromEntries(headers.map((header, index) => [header, index + 1]));
   const fields = leadFormFields(config);
@@ -143,7 +143,7 @@ export async function readLeadExcel(file, config) {
     const invalidStatus = leadStatus && !LEAD_STATUS_OPTIONS.some((option) => option.toLowerCase() === leadStatus.toLowerCase());
     if (!leadStatus) errors.push(`Row ${number}: choose a Lead status from the dropdown.`);
     if (invalidStatus) errors.push(`Row ${number}: Lead status must be New, In Progress, Accept, or Reject.`);
-    if (!leadId && (!values.name || !values.company_name)) errors.push(`Row ${number}: Name and Company are required for a new lead.`);
+    if (!leadId && !values.name) errors.push(`Row ${number}: Name is required for a new lead.`);
     rows.push({ number, leadId, leadStatus, values });
   }
   if (rows.length === 0) throw new Error("There are no lead rows to import.");
@@ -170,8 +170,7 @@ export async function importLeadRows(rows, config, env, onProgress) {
       const action = statusAction(row.leadStatus);
       if (existing?.converted_at && !action.convert)
         throw new Error("This lead is already converted and its status cannot be changed.");
-      if (!existing && (!patch.name || !patch.company_name))
-        throw new Error("Name and Company are required for a new lead.");
+      if (!existing && !patch.name) throw new Error("Name is required for a new lead.");
       const payload = {
         ...(existing ? {} : { owner_id: env.user.id, source: "Excel import", stage: "Enquiry", priority: "Normal" }),
         ...patch,

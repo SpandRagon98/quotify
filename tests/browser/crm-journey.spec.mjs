@@ -27,7 +27,7 @@ test("Lead Inbox → assigned lead → follow-up → conversion → Kanban → C
   try {
     await page.goto("/");
     await expect(
-      page.getByRole("heading", { name: "Management dashboard" }),
+      page.getByRole("heading", { name: "CRM overview" }),
     ).toBeVisible();
     await nav(page, "Lead Inbox").click();
     await page.getByRole("button", { name: "New enquiry" }).click();

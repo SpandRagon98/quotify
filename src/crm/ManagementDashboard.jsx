@@ -71,10 +71,10 @@ export default function ManagementDashboard({ env, go, reports = false }) {
       <header className="screen-head">
         <div>
           <h1 className="screen-title">
-            {reports ? "CRM reports" : "Management dashboard"}
+            {reports ? "CRM reports" : "CRM overview"}
           </h1>
           <p className="screen-sub">
-            Your enquiries, deals and follow-ups, in focus.
+            Your leads, customer accounts, opportunities and follow-ups, in focus.
           </p>
         </div>
         <button

@@ -17,9 +17,9 @@ export const FIXED_LEAD_FIELDS = [
   { key: "name", label: "Name", type: "text", required: true, kind: "standard" },
   {
     key: "company_name",
-    label: "Company",
+    label: "Company (optional)",
     type: "text",
-    required: true,
+    required: false,
     kind: "standard",
   },
 ];

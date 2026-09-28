@@ -407,6 +407,29 @@
 .lead-score-reasons li strong {
   color: var(--accent);
 }
+.change-orders-panel { margin-top: 18px; }
+.change-order-list { display: grid; gap: 12px; }
+.change-order-card { padding: 18px 20px; }
+.change-order-heading, .change-order-impact { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.change-order-heading small, .change-order-card .form-hint { color: var(--muted); }
+.change-order-heading h3 { margin: 4px 0 0; font-size: 16px; }
+.change-order-impact { justify-content: flex-start; margin: 14px 0; color: var(--muted); font-size: 13px; }
+.change-order-impact span + span { border-left: 1px solid var(--border); padding-left: 16px; }
+.change-order-impact strong { color: var(--text); }
+.change-order-public { min-height: 100vh; background: var(--page, #f6f7fa); color: var(--text); }
+.change-order-public header { min-height: 66px; display: flex; justify-content: space-between; align-items: center; padding: 0 6vw; border-bottom: 1px solid var(--border); background: var(--surface, #fff); }
+.change-order-public header span { display: inline-flex; gap: 9px; align-items: center; font-weight: 750; }
+.change-order-public header small { color: var(--muted); }
+.change-order-public main { max-width: 720px; margin: 0 auto; padding: 48px 20px; }
+.change-order-approval-card { padding: 30px; }
+.change-order-approval-card h1 { margin: 7px 0 10px; font-size: clamp(24px, 4vw, 34px); }
+.change-order-approval-card section { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 18px; }
+.change-order-approval-card section small { color: var(--muted); font-weight: 650; }
+.change-order-approval-card section p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.change-order-decision { display: flex; gap: 12px; align-items: flex-start; margin-top: 24px; padding: 16px; border-radius: 10px; }
+.change-order-decision p { margin: 4px 0 0; }
+.change-order-decision.approved { background: #12834b18; color: #267b53; }
+.change-order-decision.rejected { background: #b3261e18; color: #a62f28; }
 .crm-kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
@@ -463,6 +486,9 @@
   .lead-score-reasons {
     grid-column: 1 / -1;
   }
+  .change-order-heading { flex-direction: column; gap: 8px; }
+  .change-order-public main { padding: 24px 12px; }
+  .change-order-approval-card { padding: 21px; }
 }
 .crm-preserve-lines {
   white-space: pre-wrap;

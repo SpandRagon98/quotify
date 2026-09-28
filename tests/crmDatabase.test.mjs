@@ -59,6 +59,7 @@ before(async () => {
     "0011_lead_form_configuration",
     "0012_interior_lead_questionnaire",
     "0013_lead_scoring",
+    "0014_change_orders",
   ]) {
     const sql = await readFile(
       new URL(`../supabase/migrations/${name}.sql`, import.meta.url),
@@ -271,6 +272,32 @@ test("lead scores are calculated on the server and update when readiness changes
     ))[0];
     assert.ok(updated.lead_score > nurtured.lead_score);
     assert.equal(updated.lead_temperature, 'Nurture');
+  });
+});
+test("change orders preserve the approved scope and require the customer capability link", async () => {
+  let order;
+  await as(admin, async () => {
+    order = (await q(
+      `insert into crm_change_orders(org_id,owner_id,account_id,opportunity_id,title,scope_before,scope_after,delta_amount,delta_days,customer_email)
+       values($1,$2,$3,$4,'Upgrade wardrobe shutters','Laminate shutters','Acrylic shutters with soft-close hardware',75000,5,'customer@test.invalid')
+       returning id,share_token,order_number,status`,
+      [org, admin, account, opportunity],
+    ))[0];
+    assert.equal(order.status, 'Draft');
+    await q("update crm_change_orders set status='Sent for approval' where id=$1", [order.id]);
+  });
+  await as(null, async () => {
+    const publicOrder = (await q("select crm_change_order_public($1) as result", [order.share_token]))[0].result;
+    assert.equal(publicOrder.title, 'Upgrade wardrobe shutters');
+    assert.equal(publicOrder.status, 'Sent for approval');
+    const response = (await q("select crm_respond_change_order($1,'Approved','Ada Customer','Please proceed') as result", [order.share_token]))[0].result;
+    assert.equal(response.status, 'Approved');
+  });
+  await as(admin, async () => {
+    const saved = (await q("select status,customer_name,customer_response_note from crm_change_orders where id=$1", [order.id]))[0];
+    assert.equal(saved.status, 'Approved');
+    assert.equal(saved.customer_name, 'Ada Customer');
+    await assert.rejects(q("update crm_change_orders set status='Rejected' where id=$1", [order.id]), /approval link|final/i);
   });
 });
 test("multiple contacts, server stage probabilities and Won/Lost validation", async () => {

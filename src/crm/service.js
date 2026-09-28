@@ -208,6 +208,34 @@ export const saveRecord = (entity, orgId, payload, id) =>
           .select()
           .single(),
   );
+export const listChangeOrders = (orgId, { accountId, opportunityId } = {}) => {
+  let request = client()
+    .from("crm_change_orders")
+    .select("*")
+    .eq("org_id", orgId)
+    .is("archived_at", null)
+    .order("created_at", { ascending: false });
+  if (opportunityId) request = request.eq("opportunity_id", opportunityId);
+  else if (accountId) request = request.eq("account_id", accountId);
+  return unwrap(request);
+};
+export const saveChangeOrder = (orgId, payload, id) =>
+  unwrap(
+    id
+      ? client()
+          .from("crm_change_orders")
+          .update(payload)
+          .eq("org_id", orgId)
+          .eq("id", id)
+          .select()
+          .single()
+      : client()
+          .from("crm_change_orders")
+          .insert({ ...payload, org_id: orgId })
+          .select()
+          .single(),
+  );
+export const changeOrderUrl = (token) => `${window.location.origin}/change/${token}`;
 export const archiveRecords = (entity, orgId, ids) =>
   unwrap(
     client()

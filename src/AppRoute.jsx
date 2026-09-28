@@ -4,10 +4,13 @@ const App = lazy(() => import("./App.jsx"));
 const PublicQuotePage = lazy(
   () => import("./components/PublicQuote/PublicQuotePage.jsx"),
 );
-export default function AppRoute({ publicToken }) {
+const ChangeOrderApprovalPage = lazy(
+  () => import("./components/ChangeOrder/ChangeOrderApprovalPage.jsx"),
+);
+export default function AppRoute({ publicToken, changeOrderToken }) {
   return (
     <Suspense fallback={<LoadingScreen />}>
-      {publicToken ? <PublicQuotePage token={publicToken} /> : <App />}
+      {publicToken ? <PublicQuotePage token={publicToken} /> : changeOrderToken ? <ChangeOrderApprovalPage token={changeOrderToken} /> : <App />}
     </Suspense>
   );
 }

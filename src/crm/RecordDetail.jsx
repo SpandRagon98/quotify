@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { ArrowLeft, Plus, Pencil } from "lucide-react";
 import { getRecord, rpc } from "./service";
 import { ENTITIES, displayName, money } from "./schema";
@@ -10,6 +10,7 @@ import InboxReview from "./InboxReview";
 import DocumentPreview from "../components/common/DocumentPreview";
 import { useCompanyProfile } from "../hooks/useCompanyProfile";
 import { safeDocumentUrl } from "./helpers";
+const ChangeOrdersPanel = lazy(() => import("./ChangeOrdersPanel"));
 function LinkedDocument({ record, preset }) {
   const cfg = useCompanyProfile(record.preset_id);
   return (
@@ -137,11 +138,14 @@ export default function RecordDetail({
           "Contacts",
           "Opportunities",
           "Activities",
+          "Change orders",
           "Quotations",
           "Documents",
           "Notes",
         ]
-      : ["Overview", "Activities", "Quotations", "Documents", "Notes"]
+      : entity === "opportunities"
+        ? ["Overview", "Activities", "Change orders", "Quotations", "Documents", "Notes"]
+        : ["Overview", "Activities", "Quotations", "Documents", "Notes"]
   ).filter(
     (name) =>
       name === "Overview" ||
@@ -149,6 +153,8 @@ export default function RecordDetail({
         ? env.access.contacts?.view
         : name === "Opportunities"
           ? env.access.opportunities?.view
+          : name === "Change orders"
+            ? env.access.opportunities?.view
           : ["Activities", "Notes"].includes(name)
             ? env.access.activities?.view
             : env.access.quotations?.view),
@@ -471,6 +477,16 @@ export default function RecordDetail({
               embedded
               initialRecord={activityDefaults}
             />
+          )}
+          {tab === "Change orders" && (
+            <Suspense fallback={<div className="empty-inline">Opening change orders…</div>}>
+              <ChangeOrdersPanel
+                env={env}
+                accountId={accountId}
+                opportunityId={entity === "opportunities" ? id : null}
+                contactId={entity === "opportunities" ? record.contact_id : null}
+              />
+            </Suspense>
           )}
           {(tab === "Quotations" || tab === "Documents") && accountId && (
             <RecordList

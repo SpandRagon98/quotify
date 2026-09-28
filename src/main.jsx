@@ -11,11 +11,14 @@ import ErrorBoundary from "./components/common/ErrorBoundary.jsx";
 const publicMatch = window.location.pathname.match(
   /^\/q\/([A-Za-z0-9_-]+)\/?$/,
 );
+const changeOrderMatch = window.location.pathname.match(
+  /^\/change\/([0-9a-f-]{36})\/?$/i,
+);
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <ErrorBoundary>
-      <AppRoute publicToken={publicMatch?.[1]} />
+      <AppRoute publicToken={publicMatch?.[1]} changeOrderToken={changeOrderMatch?.[1]} />
     </ErrorBoundary>
   </StrictMode>,
 );

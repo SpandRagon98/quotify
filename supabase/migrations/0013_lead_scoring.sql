@@ -21,7 +21,7 @@ declare
   possession text := lower(coalesce(custom->>'custom_possession_status', ''));
   timeline text := lower(coalesce(custom->>'custom_timeline', ''));
   budget text := lower(coalesce(custom->>'custom_budget_range', ''));
-  area numeric := case when coalesce(custom->>'custom_carpet_area_sqft', '') ~ '^\\d+(\\.\\d+)?$' then (custom->>'custom_carpet_area_sqft')::numeric else null end;
+  area numeric := case when coalesce(custom->>'custom_carpet_area_sqft', '') ~ '^[0-9]+([.][0-9]+)?$' then (custom->>'custom_carpet_area_sqft')::numeric else null end;
   spaces jsonb := case when jsonb_typeof(custom->'custom_spaces') = 'array' then custom->'custom_spaces' else '[]'::jsonb end;
 begin
   -- Contactability: a lead with a direct way to reach the buyer deserves faster attention.

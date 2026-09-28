@@ -48,6 +48,7 @@ export async function databaseFixture(page, { role = "owner" } = {}) {
     "0013_lead_scoring",
     "0014_change_orders",
     "0015_customer_lifecycle",
+    "0016_backfill_lead_customers",
   ]) {
     await db.exec(
       (

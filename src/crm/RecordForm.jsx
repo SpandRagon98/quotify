@@ -170,6 +170,34 @@ export default function RecordForm({
                   ))}
                 </select>
               );
+            else if (f.type === "collaborators")
+              input = (
+                <div className="crm-collaborators" role="group" aria-label={f.label}>
+                  {env.members
+                    .filter((member) => member.id !== values.owner_id)
+                    .map((member) => {
+                      const selected = Array.isArray(value) && value.includes(member.id);
+                      return (
+                        <label key={member.id} className="crm-check">
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={(event) =>
+                              change(
+                                f.key,
+                                event.target.checked
+                                  ? [...(Array.isArray(value) ? value : []), member.id]
+                                  : (Array.isArray(value) ? value : []).filter((id) => id !== member.id),
+                              )
+                            }
+                          />
+                          {member.name}
+                        </label>
+                      );
+                    })}
+                  {!env.members.filter((member) => member.id !== values.owner_id).length && <small className="form-hint">No other workspace members.</small>}
+                </div>
+              );
             else if (f.type === "relation")
               input = (
                 <RelationSelect

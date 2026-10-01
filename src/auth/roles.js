@@ -38,11 +38,13 @@ const TAB_ACCESS = {
   editor: ["dashboard", "presets", "database", "docview", "email", "settings"],
   doc_viewer: ["docview", "settings"],
 };
-const CRM_TABS=['crm_dashboard','leads','accounts','contacts','opportunities','activities','inbox','reports'];
+const DAILY_TABS=['today','inbox','customers','deals','work'];
+const CRM_TABS=['crm_dashboard','leads','accounts','contacts','opportunities','activities','inbox','reports',...DAILY_TABS];
 for(const role of ['owner','admin','editor'])TAB_ACCESS[role]=[...CRM_TABS,...TAB_ACCESS[role],...(role==='editor'?[]:['workflows','permissions'])];
+for(const role of ['owner','admin','editor'])TAB_ACCESS[role].push('manage');
 TAB_ACCESS.sales_manager=[...CRM_TABS,'database','docview','email','settings'];
 TAB_ACCESS.sales_user=[...CRM_TABS,'database','docview','email','settings'];
-TAB_ACCESS.finance=['crm_dashboard','accounts','contacts','opportunities','reports','database','docview','email','settings'];
+TAB_ACCESS.finance=['crm_dashboard','accounts','contacts','opportunities','reports',...DAILY_TABS,'database','docview','email','settings'];
 TAB_ACCESS.viewer=[...CRM_TABS,'database','docview','settings'];
 
 export function allowedTabs(role) {
@@ -63,5 +65,5 @@ export function canDeleteRecords(role) {
 
 /** Default landing tab for a role. */
 export function defaultTab(role) {
-  return role === ROLES.DOC_VIEWER ? "docview" : "crm_dashboard";
+  return role === ROLES.DOC_VIEWER ? "docview" : "today";
 }

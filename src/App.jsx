@@ -43,6 +43,11 @@ const VIEW_TAB = {
   users: "users",
   settings: "settings",
   crm_dashboard: "crm_dashboard",
+  today: "today",
+  customers: "customers",
+  deals: "deals",
+  work: "work",
+  manage: "manage",
   leads: "leads",
   accounts: "accounts",
   contacts: "contacts",
@@ -59,7 +64,7 @@ export default function App() {
   const { settings, setMode, setAccent } = useSettings();
   const { presets, savePreset, deletePreset, getPreset } = usePresets();
   const [view, setView] = useState({
-    name: isSupabaseConfigured ? "crm_dashboard" : "dashboard",
+    name: isSupabaseConfigured ? "today" : "dashboard",
   });
   const [quoteContext, setQuoteContext] = useState(null);
   const [booting, setBooting] = useState(true);
@@ -125,6 +130,11 @@ export default function App() {
   const renderScreen = () => {
     switch (screenView.name) {
       case "crm_dashboard":
+      case "today":
+      case "customers":
+      case "deals":
+      case "work":
+      case "manage":
       case "leads":
       case "accounts":
       case "contacts":

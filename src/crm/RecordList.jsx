@@ -77,6 +77,8 @@ export default function RecordList({
   onCreateQuote,
   initialQuery = "",
   initialFilters = {},
+  screenTitle,
+  screenSubtitle,
 }) {
   const definition = ENTITIES[entity];
   const cap =
@@ -495,11 +497,11 @@ export default function RecordList({
       {!embedded && (
         <header className="screen-head">
           <div>
-            <h1 className="screen-title">{definition.title}</h1>
+            <h1 className="screen-title">{screenTitle || definition.title}</h1>
             <p className="screen-sub">
-              {entity === "activities"
+              {screenSubtitle || (entity === "activities"
                 ? "Your calls, tasks and follow-ups, in one place."
-                : "Workspace records, filtered securely on the server."}
+                : "Workspace records, filtered securely on the server.")}
             </p>
           </div>
           <div className="crm-lead-actions">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Check, ClipboardCopy, Plus, Send } from "lucide-react";
 import Modal from "../components/common/Modal";
 import { money } from "./schema";
@@ -60,8 +60,8 @@ export default function ChangeOrdersPanel({ env, accountId, opportunityId, conta
   const [form, setForm] = useState(null);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
-  const reload = () => listChangeOrders(env.user.orgId, { accountId, opportunityId }).then(setOrders).catch((e) => setError(e.message));
-  useEffect(() => { reload(); }, [env.user.orgId, accountId, opportunityId]);
+  const reload = useCallback(() => listChangeOrders(env.user.orgId, { accountId, opportunityId }).then(setOrders).catch((e) => setError(e.message)), [env.user.orgId, accountId, opportunityId]);
+  useEffect(() => { reload(); }, [reload]);
   const save = async (payload, id) => saveChangeOrder(env.user.orgId, payload, id);
   const send = async (order) => {
     if (!window.confirm(`Create the customer approval link for ${order.order_number}? Its scope, cost and timeline will be locked after approval.`)) return;

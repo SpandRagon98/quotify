@@ -32,6 +32,12 @@ export const ACTIVITY_TYPES = [
   "Follow-up",
   "Email",
   "Note",
+  "Site visit",
+  "Vendor coordination",
+  "Payment milestone",
+  "Delivery",
+  "Handover",
+  "Support",
 ];
 const field = (key, label, type = "text", extra = {}) => ({
   key,
@@ -40,6 +46,8 @@ const field = (key, label, type = "text", extra = {}) => ({
   ...extra,
 });
 const owner = field("owner_id", "Owner", "owner", { required: true });
+const collaborators = field("collaborator_ids", "Collaborators / watchers", "collaborators");
+const handover = field("handover_note", "Handover note", "textarea");
 const tags = field("tags", "Tags (comma separated)", "tags");
 const note = field("notes", "Internal notes", "textarea");
 const location = [
@@ -85,6 +93,7 @@ export const ENTITIES = {
       ...communication,
       field("designation", "Designation"),
       owner,
+      collaborators,
       field("source", "Lead source", "text", { default: "Manual" }),
       field("status", "Status", "select", {
         options: LEAD_STATUSES,
@@ -105,6 +114,7 @@ export const ENTITIES = {
       field("last_contacted_at", "Last contacted", "datetime-local"),
       field("next_follow_up_at", "Next follow-up", "datetime-local"),
       tags,
+      handover,
       note,
     ],
   },
@@ -124,6 +134,7 @@ export const ENTITIES = {
     fields: [
       field("name", "Account name", "text", { required: true }),
       owner,
+      collaborators,
       field("account_type", "Type", "select", {
         options: ["Company", "Personal", "Prospect", "Customer", "Partner", "Other"],
         default: "Prospect",
@@ -139,6 +150,7 @@ export const ENTITIES = {
       ...location,
       field("annual_revenue", "Annual revenue (INR)", "number"),
       tags,
+      handover,
       note,
     ],
   },
@@ -165,7 +177,9 @@ export const ENTITIES = {
       field("is_primary", "Primary contact", "checkbox"),
       field("is_decision_maker", "Decision maker", "checkbox"),
       owner,
+      collaborators,
       tags,
+      handover,
       note,
     ],
   },
@@ -187,6 +201,7 @@ export const ENTITIES = {
       account,
       contact,
       owner,
+      collaborators,
       field("amount", "Deal value", "number", { default: 0 }),
       field("currency", "Currency", "select", {
         options: ["INR", "USD", "EUR", "GBP"],
@@ -206,6 +221,7 @@ export const ENTITIES = {
       field("next_step", "Next step"),
       field("lost_reason", "Lost reason", "textarea"),
       tags,
+      handover,
     ],
   },
   activities: {
@@ -228,6 +244,7 @@ export const ENTITIES = {
         default: "Task",
       }),
       owner,
+      collaborators,
       field("lead_id", "Related lead", "relation", { entity: "leads" }),
       field("account_id", "Related account", "relation", {
         entity: "accounts",
@@ -251,6 +268,7 @@ export const ENTITIES = {
       field("description", "Description / note", "textarea"),
       field("outcome", "Outcome", "textarea"),
       tags,
+      handover,
     ],
   },
   inbox: {
@@ -320,6 +338,8 @@ export function formPayload(entity, values) {
               .map((t) => t.trim())
               .filter(Boolean);
       else if (f.type === "checkbox") v = Boolean(v);
+      else if (f.type === "collaborators")
+        v = Array.isArray(v) ? v.filter(Boolean) : [];
       else if (f.type === "number")
         v = v === "" || v == null ? null : Number(v);
       else if (f.type === "datetime-local")

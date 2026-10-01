@@ -331,6 +331,9 @@ export const dismissAiSuggestion = (id) =>
       .select("id")
       .single(),
   );
+export const getToday = (orgId) => rpc("crm_today", { p_org: orgId });
+export const installStarterPlaybook = (orgId) =>
+  rpc("crm_install_starter_playbook", { p_org: orgId });
 export const notifications = (orgId) =>
   unwrap(
     client()

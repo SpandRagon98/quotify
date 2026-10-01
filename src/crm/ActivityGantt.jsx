@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRecords } from "./useRecords";
 
 const day = 86_400_000;
@@ -6,14 +6,15 @@ const dayStart = (value) => { const date = new Date(value); date.setHours(0, 0, 
 const label = (value) => new Date(value).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
 
 export default function ActivityGantt({ env, opportunityId }) {
+  const [initialNow] = useState(() => Date.now());
   const data = useRecords("activities", env.user.orgId, { size: 100, related: { opportunity_id: opportunityId }, sort: "due_at", ascending: true });
   const { starts, origin } = useMemo(() => {
     const planned = data.rows.filter((activity) => activity.due_at);
-    const first = planned.length ? Math.min(...planned.map((activity) => dayStart(activity.due_at))) : dayStart(Date.now());
+    const first = planned.length ? Math.min(...planned.map((activity) => dayStart(activity.due_at))) : dayStart(initialNow);
     const last = planned.length ? Math.max(...planned.map((activity) => dayStart(activity.due_at) + Math.max(1, Math.ceil(Number(activity.duration_minutes || 60) / 480)) * day)) : first;
     const total = Math.min(31, Math.max(7, Math.ceil((last - first) / day) + 2));
     return { origin: first, starts: Array.from({ length: total }, (_, index) => first + index * day) };
-  }, [data.rows]);
+  }, [data.rows, initialNow]);
   return <section className="card activity-gantt">
     <div><h3 className="card-title">Activity schedule</h3><p className="form-hint">Each activity uses its due time and duration. Add or edit activities to customise this schedule.</p></div>
     {data.error && <p className="form-error">{data.error}</p>}

@@ -62,6 +62,7 @@ before(async () => {
     "0014_change_orders",
     "0015_customer_lifecycle",
     "0016_backfill_lead_customers",
+    "0017_sales_automation",
   ]) {
     const sql = await readFile(
       new URL(`../supabase/migrations/${name}.sql`, import.meta.url),
@@ -860,4 +861,33 @@ test("server validation, membership administration and workspace switching rejec
     )[0].n,
     0,
   );
+});
+
+test("qualified leads create one auditable sales quote draft without sending email", async () => {
+  const salesLead = (
+    await q(
+      "insert into crm_leads(org_id,owner_id,name,email,product,estimated_value,status) values($1,$2,'Automated quote customer','quote-customer@test.invalid','Interior design',425000,'Qualified') returning id,account_id,contact_id",
+      [org, sales],
+    )
+  )[0];
+  const drafts = await q(
+    "select quote_reference,recipient_email,status,amount,lead_id from crm_quote_drafts where lead_id=$1",
+    [salesLead.id],
+  );
+  assert.equal(drafts.length, 1);
+  assert.match(drafts[0].quote_reference, /^QYR-[A-Z0-9]{10}$/);
+  assert.equal(drafts[0].recipient_email, "quote-customer@test.invalid");
+  assert.equal(drafts[0].status, "Ready to send");
+  assert.equal(Number(drafts[0].amount), 425000);
+  await q("update crm_leads set status='Interested' where id=$1", [salesLead.id]);
+  assert.equal(
+    (await q("select count(*)::int as n from crm_quote_drafts where lead_id=$1", [salesLead.id]))[0].n,
+    1,
+  );
+  await as(sales, async () => {
+    assert.equal(
+      (await q("select count(*)::int as n from crm_quote_drafts where lead_id=$1", [salesLead.id]))[0].n,
+      1,
+    );
+  });
 });

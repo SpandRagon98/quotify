@@ -278,6 +278,59 @@ export const saveWorkflow = (orgId, payload, id) =>
           .select()
           .single(),
   );
+export const getSalesAutomationSettings = (orgId) =>
+  unwrap(
+    client()
+      .from("crm_sales_automation_settings")
+      .select("*")
+      .eq("org_id", orgId)
+      .maybeSingle(),
+  );
+export const saveSalesAutomationSettings = (orgId, payload) =>
+  unwrap(
+    client()
+      .from("crm_sales_automation_settings")
+      .upsert({ org_id: orgId, ...payload }, { onConflict: "org_id" })
+      .select()
+      .single(),
+  );
+export const listSalesQuoteDrafts = (orgId, limit = 100) =>
+  unwrap(
+    client()
+      .from("crm_quote_drafts")
+      .select("*")
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .order("created_at", { ascending: false })
+      .limit(limit),
+  );
+export const listAiSuggestions = (orgId, limit = 100) =>
+  unwrap(
+    client()
+      .from("crm_ai_suggestions")
+      .select("*, message:crm_inbound_messages(sender_email,subject,body_text,received_at,match_method)")
+      .eq("org_id", orgId)
+      .order("created_at", { ascending: false })
+      .limit(limit),
+  );
+export const dispatchSalesAutomation = async (orgId, draftId = "") => {
+  const { data, error } = await client().functions.invoke("sales-automation", {
+    body: { action: "dispatch", orgId, draftId: draftId || undefined },
+  });
+  if (error) throw new Error(data?.error || error.message || "Sales automation could not run.");
+  if (data?.error) throw new Error(data.error);
+  return data;
+};
+export const applyAiSuggestion = (id) => rpc("crm_apply_ai_suggestion", { p_suggestion: id });
+export const dismissAiSuggestion = (id) =>
+  unwrap(
+    client()
+      .from("crm_ai_suggestions")
+      .update({ status: "Dismissed", reviewed_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("id")
+      .single(),
+  );
 export const notifications = (orgId) =>
   unwrap(
     client()

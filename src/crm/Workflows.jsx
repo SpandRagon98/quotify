@@ -3,7 +3,9 @@ import { useRecords } from "./useRecords";
 import { saveWorkflow } from "./service";
 import WorkflowForm from "./WorkflowForm";
 import { Badge } from "./RecordList";
+import SalesAutomation from "./SalesAutomation";
 export default function Workflows({ env }) {
+  const [tab, setTab] = useState("rules");
   const [page, setPage] = useState(0);
   const [form, setForm] = useState(null);
   const [error, setError] = useState("");
@@ -22,10 +24,15 @@ export default function Workflows({ env }) {
             closed.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setForm({})}>
+        {tab === "rules" && <button className="btn btn-primary" onClick={() => setForm({})}>
           Create workflow
-        </button>
+        </button>}
       </header>
+      <div className="crm-tabs" role="tablist">
+        <button className={`btn ${tab === "rules" ? "btn-primary" : "btn-soft"}`} onClick={() => setTab("rules")}>Workflow rules</button>
+        <button className={`btn ${tab === "sales" ? "btn-primary" : "btn-soft"}`} onClick={() => setTab("sales")}>Sales automation</button>
+      </div>
+      {tab === "sales" ? <SalesAutomation env={env} /> : <>
       {(error || rules.error) && (
         <div className="alert alert-error">{error || rules.error}</div>
       )}
@@ -166,6 +173,7 @@ export default function Workflows({ env }) {
           }}
         />
       )}
+      </>}
     </div>
   );
 }

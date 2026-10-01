@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Modal from "../components/common/Modal";
 import { ENTITIES, displayName, formPayload } from "./schema";
-import { getRecord, saveRecord } from "./service";
+import { dispatchSalesAutomation, getRecord, saveRecord } from "./service";
 import { useRecords } from "./useRecords";
 import { eligibleOwners } from "./helpers";
 export function RelationSelect({
@@ -129,6 +129,10 @@ export default function RecordForm({
         payload.mapped_fields = { ...payload };
       }
       const row = await saveRecord(entity, env.user.orgId, payload, record.id);
+      // Drafts are database-triggered. Dispatch is deliberately non-blocking:
+      // saving a customer record must not fail because an email provider is down.
+      if (["leads", "opportunities"].includes(entity))
+        dispatchSalesAutomation(env.user.orgId).catch(() => {});
       onSaved(row);
     } catch (err) {
       setError(err.message);

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { ArrowLeft, Plus, Pencil } from "lucide-react";
-import { getRecord, rpc } from "./service";
+import { dispatchSalesAutomation, getRecord, rpc, saveRecord } from "./service";
 import { ENTITIES, displayName, money } from "./schema";
 import RecordForm from "./RecordForm";
 import RecordList, { Badge } from "./RecordList";
@@ -215,7 +215,7 @@ export default function RecordDetail({
             <button
               className="btn btn-primary"
               onClick={async () => {
-                try { await saveRecord("leads", env.user.orgId, { status: "Interested" }, record.id); reload(); }
+                try { await saveRecord("leads", env.user.orgId, { status: "Interested" }, record.id); dispatchSalesAutomation(env.user.orgId).catch(() => {}); reload(); }
                 catch (requestError) { setError(requestError.message); }
               }}
             >

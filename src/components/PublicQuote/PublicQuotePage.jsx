@@ -154,6 +154,7 @@ export default function PublicQuotePage({ token }) {
   };
 
   const snap = quote?.snapshot || {};
+  const automated = snap.kind === "automated" ? snap.automatedQuote || {} : null;
   // Saved document type: Google Doc quotes show the generated Doc; everything
   // else renders the native document from the snapshot.
   const gdocId = snap.docType === "googledoc" && snap.docUrl ? extractId(snap.docUrl) : "";
@@ -230,7 +231,20 @@ export default function PublicQuotePage({ token }) {
               </button>
             </div>
 
-            {isGoogleDoc ? (
+            {automated ? (
+              <div className="pub-quote-doc pub-automated-quote">
+                <span className="pub-automated-eyebrow">Quotation summary</span>
+                <h1>{automated.product || "Your requested service"}</h1>
+                <p>Hello {automated.customerName || "there"},</p>
+                <p className="pub-automated-copy">{automated.body || "Your quotation is ready for review."}</p>
+                <dl className="pub-automated-details">
+                  <div><dt>Reference</dt><dd>{automated.reference || quote?.quotation_id}</dd></div>
+                  <div><dt>Estimated value</dt><dd>{automated.amount || "On request"}</dd></div>
+                  {automated.companyName && <div><dt>Customer</dt><dd>{automated.companyName}</dd></div>}
+                </dl>
+                <p className="form-hint">This is an automatically prepared quotation summary. Your Qyrova team will confirm the final scope and line items with you.</p>
+              </div>
+            ) : isGoogleDoc ? (
               <div className="pub-quote-doc pub-quote-gdoc">
                 <iframe
                   title="Quotation document"

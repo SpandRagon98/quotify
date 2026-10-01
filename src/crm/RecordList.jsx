@@ -12,6 +12,7 @@ import {
 import { ENTITIES, labelFor, money, activityStatus } from "./schema";
 import {
   archiveRecords,
+  dispatchSalesAutomation,
   getLeadFormConfig,
   rpc,
   saveLeadFormConfig,
@@ -209,6 +210,7 @@ export default function RecordList({
         setLeadImport({ ...leadImport, errors: result.errors });
         setLeadImportProgress(`${detail}. Fix the listed rows and import them again.`);
       } else {
+        dispatchSalesAutomation(env.user.orgId).catch(() => {});
         setLeadImport(null);
         setLeadImportProgress(`${detail}.`);
         data.reload();

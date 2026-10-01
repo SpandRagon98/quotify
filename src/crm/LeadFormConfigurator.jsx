@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Calculator, Home, Plus, Trash2 } from "lucide-react";
 import Modal from "../components/common/Modal";
-import { saveRecord } from "./service";
+import { dispatchSalesAutomation, saveRecord } from "./service";
 import {
   FIXED_LEAD_FIELDS,
   OPTIONAL_STANDARD_LEAD_FIELDS,
@@ -97,6 +97,7 @@ export function LeadCreateForm({ config, pricing, env, onClose, onSaved }) {
         priority: "Normal",
         ...payload,
       });
+      dispatchSalesAutomation(env.user.orgId).catch(() => {});
       onSaved(lead);
     } catch (requestError) {
       setError(requestError.message);

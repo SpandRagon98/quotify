@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRecords } from "./useRecords";
-import { installStarterPlaybook, saveWorkflow } from "./service";
+import { saveWorkflow } from "./service";
 import WorkflowForm from "./WorkflowForm";
 import { Badge } from "./RecordList";
 import SalesAutomation from "./SalesAutomation";
@@ -9,9 +9,7 @@ export default function Workflows({ env }) {
   const [page, setPage] = useState(0);
   const [form, setForm] = useState(null);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [historyPage, setHistoryPage] = useState(0);
-  const [installing, setInstalling] = useState(false);
   const rules = useRecords("workflows", env.user.orgId, { page });
   const history = useRecords("workflow_executions", env.user.orgId, {
     page: historyPage,
@@ -26,15 +24,15 @@ export default function Workflows({ env }) {
             closed.
           </p>
         </div>
-        {tab === "rules" && <div className="head-actions"><button className="btn btn-soft" disabled={installing} onClick={async () => { setInstalling(true); setError(""); setNotice(""); try { const added = await installStarterPlaybook(env.user.orgId); setNotice(added ? `${added} starter rules installed.` : "The starter playbook is already installed."); rules.reload(); } catch (requestError) { setError(requestError.message); } finally { setInstalling(false); } }}>{installing ? "Installing…" : "Install starter playbook"}</button><button className="btn btn-primary" onClick={() => setForm({})}>Create workflow</button></div>}
+        {tab === "rules" && <button className="btn btn-primary" onClick={() => setForm({})}>
+          Create workflow
+        </button>}
       </header>
       <div className="crm-tabs" role="tablist">
         <button className={`btn ${tab === "rules" ? "btn-primary" : "btn-soft"}`} onClick={() => setTab("rules")}>Workflow rules</button>
         <button className={`btn ${tab === "sales" ? "btn-primary" : "btn-soft"}`} onClick={() => setTab("sales")}>Sales automation</button>
       </div>
       {tab === "sales" ? <SalesAutomation env={env} /> : <>
-      <div className="card crm-playbook-callout"><strong>Built for a small team</strong><span>Install first-response, discovery, quote follow-up, delivery and lost-deal routines in one click. You can edit or disable every rule later.</span></div>
-      {notice && <div className="alert alert-success">{notice}</div>}
       {(error || rules.error) && (
         <div className="alert alert-error">{error || rules.error}</div>
       )}

@@ -429,8 +429,6 @@ export default function RecordDetail({
                             ) : (
                               "No"
                             )
-                          ) : f.type === "collaborators" ? (
-                            (record[f.key] || []).map((memberId) => env.members.find((member) => member.id === memberId)?.name || "Member").join(", ") || "—"
                           ) : Array.isArray(record[f.key]) ? (
                             record[f.key].join(", ")
                           ) : (

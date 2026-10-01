@@ -6,8 +6,6 @@ import ManagementDashboard from "./ManagementDashboard";
 import LeadInbox from "./LeadInbox";
 import Workflows from "./Workflows";
 import TeamMembers from "./TeamMembers";
-import TodayPage from "./TodayPage";
-import ManageHub from "./ManageHub";
 export default function CRMPage({ view, go, presets, onCreateQuote }) {
   const env = useCRM();
   if (env.loading)
@@ -34,13 +32,6 @@ export default function CRMPage({ view, go, presets, onCreateQuote }) {
         reports={view.name === "reports"}
       />
     );
-  if (view.name === "today") return <TodayPage env={env} go={go} />;
-  if (view.name === "customers")
-    return <RecordList entity="accounts" env={env} go={go} screenTitle="Customers" screenSubtitle="Every person or company, with one shared customer history." />;
-  if (view.name === "deals") return <Pipeline env={env} go={go} />;
-  if (view.name === "work")
-    return <RecordList entity="activities" env={env} go={go} screenTitle="Work" screenSubtitle="Calls, site visits, delivery, payments, handover and support in one schedule." />;
-  if (view.name === "manage") return <ManageHub env={env} go={go} />;
   if (view.name === "crm_record")
     return (
       <RecordDetail

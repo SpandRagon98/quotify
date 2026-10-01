@@ -63,7 +63,6 @@ before(async () => {
     "0015_customer_lifecycle",
     "0016_backfill_lead_customers",
     "0017_sales_automation",
-    "0018_daily_operating_system",
   ]) {
     const sql = await readFile(
       new URL(`../supabase/migrations/${name}.sql`, import.meta.url),
@@ -890,26 +889,5 @@ test("qualified leads create one auditable sales quote draft without sending ema
       (await q("select count(*)::int as n from crm_quote_drafts where lead_id=$1", [salesLead.id]))[0].n,
       1,
     );
-  });
-});
-
-test("daily operating system returns bounded work and installs an idempotent starter playbook", async () => {
-  await as(admin, async () => {
-    assert.equal((await q("select crm_install_starter_playbook($1) as n", [org]))[0].n, 5);
-    assert.equal((await q("select crm_install_starter_playbook($1) as n", [org]))[0].n, 0);
-  });
-  const shared = (
-    await q(
-      "insert into crm_leads(org_id,owner_id,name,email,collaborator_ids,handover_note) values($1,$2,'Shared daily lead','shared-daily@test.invalid',array[$3]::uuid[],'Ask Priya to confirm the site visit.') returning id,collaborator_ids,handover_note",
-      [org, sales, admin],
-    )
-  )[0];
-  assert.deepEqual(shared.collaborator_ids, [admin]);
-  assert.equal(shared.handover_note, "Ask Priya to confirm the site visit.");
-  await as(sales, async () => {
-    const today = (await q("select crm_today($1) as result", [org]))[0].result;
-    assert.ok(Array.isArray(today.new_leads));
-    assert.ok(Array.isArray(today.my_work));
-    assert.ok(Array.isArray(today.team_snapshot));
   });
 });

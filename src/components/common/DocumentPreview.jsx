@@ -6,6 +6,7 @@ import { formatFieldValue } from "../../utils/fieldFormatters";
 import { computeCalculatedValues, formatCalculated } from "../../utils/formula";
 import { buildDocPlaceholderMap, replaceDocPlaceholders } from "../../utils/docPlaceholders";
 import { flattenFields, getSubfields, subColumnLabel } from "../../utils/subfields";
+import JourneyDocument from "../../crm/JourneyDocument";
 
 function makePicker(onPick) {
   return (e) => {
@@ -53,6 +54,7 @@ export default function DocumentPreview({
   const [copied, setCopied] = useState("");
   const logoInputRef = useRef(null);
   const bannerInputRef = useRef(null);
+  if (values?.__journey) return <JourneyDocument document={values.__journey} reference={quotationId} logo={logo} />;
 
   const isTemplate = mode === "template" || !values;
   const calc = isTemplate ? {} : computeCalculatedValues(preset, values);

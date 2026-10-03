@@ -10,6 +10,9 @@ import InboxReview from "./InboxReview";
 import DocumentPreview from "../components/common/DocumentPreview";
 import { useCompanyProfile } from "../hooks/useCompanyProfile";
 import { safeDocumentUrl } from "./helpers";
+import CustomerGuidance from "./CustomerGuidance";
+import { stageLabel } from "./brain";
+import NativeDocumentActions from "./NativeDocumentActions";
 const ChangeOrdersPanel = lazy(() => import("./ChangeOrdersPanel"));
 const ActivityGantt = lazy(() => import("./ActivityGantt"));
 const LeadJourney = lazy(() => import("./LeadJourney"));
@@ -18,8 +21,8 @@ function LinkedDocument({ record, preset }) {
   return (
     <>
       <p className="form-hint">
-        Saved CRM snapshot. Edit the original quotation through Sales →
-        Quotations to fetch the latest Google Sheet row.
+        Saved CRM snapshot. Use Existing quotation records in Documents to edit
+        the original Google Sheet quotation.
       </p>
       <DocumentPreview
         preset={preset}
@@ -41,6 +44,7 @@ export default function RecordDetail({
   go,
   presets,
   onCreateQuote,
+  initialAction,
 }) {
   const [record, setRecord] = useState(null);
   const [summary, setSummary] = useState(null);
@@ -146,7 +150,15 @@ export default function RecordDetail({
           "Notes",
         ]
       : entity === "opportunities"
-        ? ["Overview", "Activities", "Schedule", "Change orders", "Quotations", "Documents", "Notes"]
+        ? [
+            "Overview",
+            "Activities",
+            "Schedule",
+            "Change orders",
+            "Quotations",
+            "Documents",
+            "Notes",
+          ]
         : ["Overview", "Activities", "Quotations", "Documents", "Notes"]
   ).filter(
     (name) =>
@@ -157,12 +169,13 @@ export default function RecordDetail({
           ? env.access.opportunities?.view
           : name === "Change orders"
             ? env.access.opportunities?.view
-          : name === "Schedule"
-            ? env.access.activities?.view
-          : ["Activities", "Notes"].includes(name)
-            ? env.access.activities?.view
-            : env.access.quotations?.view),
+            : name === "Schedule"
+              ? env.access.activities?.view
+              : ["Activities", "Notes"].includes(name)
+                ? env.access.activities?.view
+                : env.access.quotations?.view),
   );
+  tabs.push("Details");
   const relation =
     entity === "accounts"
       ? { account_id: id }
@@ -185,16 +198,27 @@ export default function RecordDetail({
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1 className="screen-title">{displayName(entity, record)}</h1>
+            <h1 className="screen-title">
+              {entity === "accounts" && summary?.primary_contact?.name
+                ? summary.primary_contact.name
+                : displayName(entity, record)}
+            </h1>
             <p className="screen-sub">
-              {definition.singular} · {owner} ·{" "}
-              {[record.industry, record.city, record.state]
+              {[
+                entity === "accounts"
+                  ? record.name
+                  : entity === "quote_links"
+                    ? record.document_kind
+                    : definition.singular,
+                owner,
+                record.city,
+                record.state,
+              ]
                 .filter(Boolean)
-                .join(", ")}{" "}
-              ·{" "}
+                .join(" · ")}{" "}
               <Badge>
                 {record.status ||
-                  record.stage ||
+                  (record.stage ? stageLabel(record.stage) : null) ||
                   record.account_type ||
                   "Active"}
               </Badge>
@@ -211,17 +235,30 @@ export default function RecordDetail({
               Edit
             </button>
           )}
-          {entity === "leads" && cap.edit && !record.opportunity_id && !record.converted_opportunity_id && (
-            <button
-              className="btn btn-primary"
-              onClick={async () => {
-                try { await saveRecord("leads", env.user.orgId, { status: "Interested" }, record.id); dispatchSalesAutomation(env.user.orgId).catch(() => {}); reload(); }
-                catch (requestError) { setError(requestError.message); }
-              }}
-            >
-              Mark interested
-            </button>
-          )}
+          {entity === "leads" &&
+            cap.edit &&
+            !record.opportunity_id &&
+            !record.converted_opportunity_id && (
+              <button
+                className="btn btn-primary"
+                onClick={async () => {
+                  try {
+                    await saveRecord(
+                      "leads",
+                      env.user.orgId,
+                      { status: "Interested" },
+                      record.id,
+                    );
+                    dispatchSalesAutomation(env.user.orgId).catch(() => {});
+                    reload();
+                  } catch (requestError) {
+                    setError(requestError.message);
+                  }
+                }}
+              >
+                Mark interested
+              </button>
+            )}
           {accountId && entity !== "accounts" && (
             <button
               className="btn btn-soft"
@@ -235,13 +272,19 @@ export default function RecordDetail({
           {env.access.quotations?.create && accountId && (
             <button
               className="btn btn-primary"
-              onClick={() => onCreateQuote(context)}
+              onClick={() => go("quote_wizard", { context })}
             >
               Create quotation
             </button>
           )}
         </div>
       </header>
+      {["accounts", "opportunities"].includes(entity) && (
+        <CustomerGuidance
+          {...{ env, entity, id, go, onCreateQuote, initialAction, revision }}
+          onChanged={reload}
+        />
+      )}
       {summary && (
         <p className="screen-sub">
           Main contact:{" "}
@@ -260,7 +303,10 @@ export default function RecordDetail({
         <div className="lead-score-summary card">
           <div>
             <small>Lead score</small>
-            <strong>{record.lead_score ?? 0}<span>/100</span></strong>
+            <strong>
+              {record.lead_score ?? 0}
+              <span>/100</span>
+            </strong>
           </div>
           <div>
             <small>Priority band</small>
@@ -269,16 +315,51 @@ export default function RecordDetail({
           <div className="lead-score-reasons">
             <small>Why this score</small>
             {record.lead_score_reasons?.length ? (
-              <ul>{record.lead_score_reasons.map((reason) => <li key={reason.label}>{reason.label} <strong>+{reason.points}</strong></li>)}</ul>
-            ) : <span>Add contact, project, and timeline details to make this lead easier to prioritise.</span>}
+              <ul>
+                {record.lead_score_reasons.map((reason) => (
+                  <li key={reason.label}>
+                    {reason.label} <strong>+{reason.points}</strong>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <span>
+                Add contact, project, and timeline details to make this lead
+                easier to prioritise.
+              </span>
+            )}
           </div>
         </div>
       )}
-      {entity === "leads" && <Suspense fallback={null}><LeadJourney lead={record} onMarkInterested={async () => {
-        try { await saveRecord("leads", env.user.orgId, { status: "Interested" }, record.id); reload(); }
-        catch (requestError) { setError(requestError.message); }
-      }} /></Suspense>}
-      {summary && (
+      {entity === "leads" && (
+        <Suspense fallback={null}>
+          <LeadJourney
+            lead={record}
+            onMarkInterested={async () => {
+              try {
+                await saveRecord(
+                  "leads",
+                  env.user.orgId,
+                  { status: "Interested" },
+                  record.id,
+                );
+                reload();
+              } catch (requestError) {
+                setError(requestError.message);
+              }
+            }}
+          />
+        </Suspense>
+      )}
+      {entity === "leads" &&
+        cap.edit &&
+        tab === "Details" &&
+        !record.converted_at && (
+          <button className="btn btn-soft" onClick={() => setConvert(true)}>
+            Convert lead
+          </button>
+        )}
+      {summary && tab === "Details" && (
         <div className="crm-kpis">
           {[
             ["Contacts", summary.contacts],
@@ -335,7 +416,7 @@ export default function RecordDetail({
                 })
               }
             >
-              Create opportunity
+              Create deal
             </button>
           )}
         </div>
@@ -355,18 +436,26 @@ export default function RecordDetail({
               Open generated document
             </a>
           )}
-          <button
-            className="btn btn-soft"
-            onClick={() =>
-              go("database", {
-                presetId: record.preset_id,
-                initialQuery: record.quotation_id,
-              })
-            }
-          >
-            Open original in Quotations
-          </button>
-          {presets.find((p) => p.id === record.preset_id) ? (
+          {!record.values_snapshot?.__journey && (
+            <button
+              className="btn btn-soft"
+              onClick={() =>
+                go("database", {
+                  presetId: record.preset_id,
+                  initialQuery: record.quotation_id,
+                })
+              }
+            >
+              Open original in Quotations
+            </button>
+          )}
+          {record.values_snapshot?.__journey ? (
+            <NativeDocumentActions
+              record={record}
+              env={env}
+              onChanged={reload}
+            />
+          ) : presets.find((p) => p.id === record.preset_id) ? (
             <LinkedDocument
               record={record}
               preset={presets.find((p) => p.id === record.preset_id)}
@@ -389,11 +478,18 @@ export default function RecordDetail({
                 className={`btn ${tab === name ? "btn-primary" : "btn-soft"}`}
                 onClick={() => setTab(name)}
               >
-                {name}
+                {name === "Opportunities"
+                  ? "Deals"
+                  : name === "Quotations"
+                    ? "Quotes"
+                    : name}
               </button>
             ))}
           </div>
           {tab === "Overview" && (
+            <Timeline env={env} related={timelineRelated} key={revision} />
+          )}
+          {tab === "Details" && (
             <div className="crm-detail-grid">
               <div className="card">
                 <h3 className="card-title">Record details</h3>
@@ -490,17 +586,27 @@ export default function RecordDetail({
             />
           )}
           {tab === "Schedule" && entity === "opportunities" && (
-            <Suspense fallback={<div className="empty-inline">Opening activity schedule…</div>}>
+            <Suspense
+              fallback={
+                <div className="empty-inline">Opening activity schedule…</div>
+              }
+            >
               <ActivityGantt env={env} opportunityId={id} />
             </Suspense>
           )}
           {tab === "Change orders" && (
-            <Suspense fallback={<div className="empty-inline">Opening change orders…</div>}>
+            <Suspense
+              fallback={
+                <div className="empty-inline">Opening change orders…</div>
+              }
+            >
               <ChangeOrdersPanel
                 env={env}
                 accountId={accountId}
                 opportunityId={entity === "opportunities" ? id : null}
-                contactId={entity === "opportunities" ? record.contact_id : null}
+                contactId={
+                  entity === "opportunities" ? record.contact_id : null
+                }
               />
             </Suspense>
           )}

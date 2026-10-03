@@ -14,7 +14,7 @@ export default function QuotationPrefill({
 }) {
   const cloudEnv = useCRM();
   env = env || cloudEnv;
-  const [presetId, setPresetId] = useState(presets[0]?.id || "");
+  const [presetId, setPresetId] = useState(context.preset_id || presets[0]?.id || "");
   const [customer, setCustomer] = useState(null);
   const [mapping, setMapping] = useState({});
   const [amount, setAmount] = useState("");

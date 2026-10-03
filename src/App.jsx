@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { lazy, Suspense, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import AppLayout from "./components/Layout/WorkspaceLayout";
 import LoadingScreen from "./components/common/LoadingScreen";
 import Dashboard from "./components/Dashboard/Overview";
@@ -26,9 +26,12 @@ import {
 } from "./auth/roles";
 import CRMProvider from "./crm/CRMProvider";
 const CRMPage = lazy(() => import("./crm/CRMPage"));
+const QuoteStepper = lazy(() => import("./crm/QuoteStepper"));
+const SettingsHub = lazy(() => import("./crm/SettingsHub"));
 import QuotationPrefill from "./crm/QuotationPrefill";
 import { isSupabaseConfigured } from "./lib/supabaseClient";
 import "./crm/crm.css";
+import "./crm/journey.css";
 
 /** Maps each view to the sidebar tab that governs access to it. */
 const VIEW_TAB = {
@@ -52,9 +55,14 @@ const VIEW_TAB = {
   workflows: "workflows",
   reports: "reports",
   permissions: "permissions",
+  customers: "customers",
+  tasks: "tasks",
+  documents: "documents",
+  quote_wizard: "documents",
 };
 
 export default function App() {
+  const reducedMotion = useReducedMotion();
   const auth = useAuth();
   const { settings, setMode, setAccent } = useSettings();
   const { presets, savePreset, deletePreset, getPreset } = usePresets();
@@ -62,19 +70,21 @@ export default function App() {
     name: isSupabaseConfigured ? "crm_dashboard" : "dashboard",
   });
   const [quoteContext, setQuoteContext] = useState(null);
-  const [booting, setBooting] = useState(true);
-
-  useEffect(() => {
-    const t = setTimeout(() => setBooting(false), 1600);
-    return () => clearTimeout(t);
-  }, []);
-
-  const go = (name, extra = {}) => setView({ name, ...extra });
+  const [createIntent, setCreateIntent] = useState(null);
+  const go = (name, extra = {}) => {
+    if (name === "create") {
+      if (["Quotation", "Invoice", "Proposal"].includes(extra.kind))
+        setView({ name: "quote_wizard", documentKind: extra.kind });
+      else setCreateIntent(extra.kind);
+      return;
+    }
+    setView({ name, ...extra });
+  };
   const handleNav = (key) => go(key);
 
   // --- Splash, then auth gates (all hooks above run unconditionally) ---
   // Wait for the (cloud) session to restore before deciding which screen to show.
-  if (booting || !auth.ready) return <LoadingScreen />;
+  if (!auth.ready) return <LoadingScreen />;
   if (auth.startupError)
     return (
       <div className="crash-screen">
@@ -135,6 +145,9 @@ export default function App() {
       case "workflows":
       case "reports":
       case "permissions":
+      case "customers":
+      case "tasks":
+      case "documents":
         return (
           <CRMPage
             view={screenView}
@@ -197,16 +210,27 @@ export default function App() {
           />
         );
 
+      case "quote_wizard":
+        return (
+          <QuoteStepper
+            user={auth.currentUser}
+            go={go}
+            documentKind={screenView.documentKind || "Quotation"}
+            context={screenView.context}
+          />
+        );
       case "settings":
         return (
-          <SettingsPage
-            settings={settings}
-            setMode={setMode}
-            setAccent={setAccent}
-            user={auth.currentUser}
-            canEditMeta={["owner", "admin", "editor"].includes(role)}
-            onUpdateProfile={auth.updateProfile}
-          />
+          <SettingsHub go={go} allowedTabs={tabs}>
+            <SettingsPage
+              settings={settings}
+              setMode={setMode}
+              setAccent={setAccent}
+              user={auth.currentUser}
+              canEditMeta={["owner", "admin", "editor"].includes(role)}
+              onUpdateProfile={auth.updateProfile}
+            />
+          </SettingsHub>
         );
 
       case "presets":
@@ -322,14 +346,21 @@ export default function App() {
           allowedTabs={tabs}
           user={auth.currentUser}
           onLogout={auth.logout}
+          go={go}
+          createIntent={createIntent}
+          clearCreateIntent={() => setCreateIntent(null)}
         >
           <AnimatePresence mode="wait">
             <motion.div
               key={`${screenView.name}:${screenView.presetId || ""}:${screenView.editingQuotationId || "new"}`}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.22 }}
+              initial={{
+                opacity: 0,
+                y: reducedMotion ? 0 : 6,
+                filter: reducedMotion ? "none" : "blur(4px)",
+              }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: reducedMotion ? 0 : -3 }}
+              transition={{ duration: reducedMotion ? 0 : 0.18 }}
             >
               <Suspense
                 fallback={

@@ -2,20 +2,55 @@ import { test, expect } from "@playwright/test";
 import { databaseFixture } from "./database-fixture.mjs";
 const nav = (page, name) => ({
   async click() {
-    const target = page.getByRole("navigation", { name: "Main navigation" })
-      .getByRole("button", { name, exact: true });
-    if (await target.count() === 0) {
-      const section = ['Overview', 'Presets', 'Quotations', 'Documents', 'Email'].includes(name) ? 'Sales'
-        : name === 'Workflows' ? 'Automation' : name === 'Reports' ? 'Reports'
-        : ['Settings', 'Team members', 'Roles & permissions'].includes(name) ? 'Admin' : 'CRM';
-      const close = page.getByRole('button', { name: 'Close menu', exact: true });
-      if (await close.isVisible()) await close.click();
-      await page.getByRole('navigation', { name: 'Workspace sections' })
-        .getByRole('button', { name: section, exact: true }).click();
-    }
-    const open = page.getByRole('button', { name: 'Open menu', exact: true });
-    if (await open.isVisible() && !await target.isVisible()) await open.click();
-    await target.click();
+    const continueLater = page.getByRole("button", {
+      name: "Continue later",
+      exact: true,
+    });
+    if (await continueLater.isVisible()) await continueLater.click();
+    const primary =
+      {
+        Accounts: "Customers",
+        Leads: "Customers",
+        Opportunities: "Deals",
+        Activities: "Tasks",
+        Dashboard: "Reports",
+        "Lead Inbox": "Settings",
+        Workflows: "Settings",
+      }[name] || name;
+    const target = page
+      .getByRole("navigation", { name: "Main navigation" })
+      .getByRole("button", { name: primary, exact: true });
+    const settings = page
+      .locator(".sidebar-bottom")
+      .getByRole("button", { name: "Settings", exact: true });
+    const destination = primary === "Settings" ? settings : target;
+    const open = page.getByRole("button", { name: "Open menu", exact: true });
+    if ((await open.isVisible()) && !(await destination.isVisible()))
+      await open.click();
+    await destination.click();
+    if (name === "Accounts")
+      await page
+        .getByRole("button", {
+          name: "Companies & personal accounts",
+          exact: true,
+        })
+        .click();
+    if (name === "Leads")
+      await page
+        .getByRole("button", { name: "Enquiries", exact: true })
+        .click();
+    if (name === "Activities")
+      await page
+        .getByRole("button", { name: "All activities", exact: true })
+        .click();
+    if (name === "Lead Inbox")
+      await page.getByRole("button", { name: /^Integrations/ }).click();
+    if (name === "Workflows")
+      await page.getByRole("button", { name: /^Automation/ }).click();
+    if (name === "Dashboard")
+      await page
+        .getByRole("button", { name: "Advanced reports", exact: true })
+        .click();
   },
 });
 test("Lead Inbox → assigned lead → follow-up → conversion → Kanban → Customer 360 → original quotation/PDF", async ({
@@ -26,9 +61,7 @@ test("Lead Inbox → assigned lead → follow-up → conversion → Kanban → C
   page.on("pageerror", (e) => runtimeErrors.push(e.message));
   try {
     await page.goto("/");
-    await expect(
-      page.getByRole("heading", { name: "CRM overview" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Good / })).toBeVisible();
     await nav(page, "Lead Inbox").click();
     await page.getByRole("button", { name: "New enquiry" }).click();
     const dialog = page.getByRole("dialog");
@@ -71,6 +104,7 @@ test("Lead Inbox → assigned lead → follow-up → conversion → Kanban → C
     await page
       .getByRole("button", { name: "Ada enquiry", exact: true })
       .click();
+    await page.getByRole("tab", { name: "Details", exact: true }).click();
     await page
       .getByRole("button", { name: "Convert lead", exact: true })
       .click();
@@ -78,7 +112,7 @@ test("Lead Inbox → assigned lead → follow-up → conversion → Kanban → C
       .getByRole("button", { name: "Convert lead", exact: true })
       .click();
     await expect(
-      page.getByRole("heading", { name: "Analytical Engines", exact: true }),
+      page.getByRole("heading", { name: "Ada enquiry", exact: true }),
     ).toBeVisible();
     await page.getByRole("tab", { name: "Contacts", exact: true }).click();
     await expect(
@@ -96,7 +130,7 @@ test("Lead Inbox → assigned lead → follow-up → conversion → Kanban → C
       .selectOption("Discovery");
     await expect(
       page
-        .locator('.crm-lane[aria-label="Discovery"]')
+        .locator('.crm-lane[aria-label="Talking"]')
         .getByRole("button", { name: "Ada enquiry opportunity", exact: true }),
     ).toBeVisible();
     await page
@@ -106,10 +140,13 @@ test("Lead Inbox → assigned lead → follow-up → conversion → Kanban → C
       .getByRole("button", { name: "Customer 360", exact: true })
       .click();
     await expect(
-      page.getByText("Qualification → Discovery", { exact: true }),
+      page.getByText("New Enquiry → Talking", { exact: true }),
     ).toBeVisible();
     await page
-      .getByRole("button", { name: "Create quotation", exact: true })
+      .getByRole("button", {
+        name: "Use custom quotation template",
+        exact: true,
+      })
       .first()
       .click();
     await dialog
@@ -159,13 +196,13 @@ test("Lead Inbox → assigned lead → follow-up → conversion → Kanban → C
     await expect.poll(() => fixture.sheet.rows.length).toBe(1);
     await nav(page, "Dashboard").click();
     await expect(
-      page.getByRole("heading", { name: "Management dashboard" }),
+      page.getByRole("heading", { name: "CRM reports" }),
     ).toBeVisible();
     await nav(page, "Accounts").click();
     await page
       .getByRole("button", { name: "Analytical Engines", exact: true })
       .click();
-    await page.getByRole("tab", { name: "Quotations", exact: true }).click();
+    await page.getByRole("tab", { name: "Quotes", exact: true }).click();
     await expect(
       page.getByRole("button", { name: link.quotation_id, exact: true }),
     ).toBeVisible();
@@ -234,7 +271,9 @@ test("workflows create activities and disabled rules remain inactive through the
     await page.getByRole("button", { name: "New lead" }).click();
     await dialog.getByLabel("Name").fill("Workflow browser enquiry");
     await dialog.getByLabel("Company").fill("Workflow test company");
-    await dialog.getByRole("button", { name: "Create lead", exact: true }).click();
+    await dialog
+      .getByRole("button", { name: "Create lead", exact: true })
+      .click();
     await nav(page, "Activities").click();
     await page.getByLabel("Activity view").selectOption("All");
     await expect(
@@ -247,7 +286,9 @@ test("workflows create activities and disabled rules remain inactive through the
     await page.getByRole("button", { name: "New lead" }).click();
     await dialog.getByLabel("Name").fill("Disabled workflow enquiry");
     await dialog.getByLabel("Company").fill("Disabled workflow company");
-    await dialog.getByRole("button", { name: "Create lead", exact: true }).click();
+    await dialog
+      .getByRole("button", { name: "Create lead", exact: true })
+      .click();
     expect(
       Number(
         (
@@ -271,13 +312,11 @@ test("responsive navigation, themes and read-only Viewer UI", async ({
   try {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
-    await expect(
-      page.getByRole("heading", { name: "Management dashboard" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Good / })).toBeVisible();
     await page.getByRole("button", { name: "Open menu" }).click();
     await nav(page, "Leads").click();
     await expect(
-      page.getByRole("heading", { name: "Leads", exact: true }),
+      page.getByRole("heading", { name: "Customers", exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "New lead" })).toHaveCount(0);
     await page.screenshot({
@@ -295,6 +334,9 @@ test("responsive navigation, themes and read-only Viewer UI", async ({
     await page.getByRole("button", { name: "Glass", exact: true }).click();
     await page.setViewportSize({ width: 1440, height: 1000 });
     await nav(page, "Documents").click();
+    await page
+      .getByRole("button", { name: "Template previews", exact: true })
+      .click();
     await expect(page.getByRole("heading", { name: "Doc View" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Upload Logo" })).toHaveCount(
       0,

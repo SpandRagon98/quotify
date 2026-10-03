@@ -2,7 +2,11 @@ import { useCRM } from "./context";
 import RecordList from "./RecordList";
 import RecordDetail from "./RecordDetail";
 import Pipeline from "./Pipeline";
-import ManagementDashboard from "./ManagementDashboard";
+import JourneyHome from "./JourneyHome";
+import Customers from "./Customers";
+import TaskCenter from "./TaskCenter";
+import DocumentsHub from "./DocumentsHub";
+import JourneyReports from "./JourneyReports";
 import LeadInbox from "./LeadInbox";
 import Workflows from "./Workflows";
 import TeamMembers from "./TeamMembers";
@@ -24,12 +28,17 @@ export default function CRMPage({ view, go, presets, onCreateQuote }) {
         </button>
       </div>
     );
-  if (view.name === "crm_dashboard" || view.name === "reports")
+  if (view.name === "crm_dashboard") return <JourneyHome env={env} go={go} />;
+  if (view.name === "reports") return <JourneyReports env={env} go={go} />;
+  if (view.name === "customers") return <Customers env={env} go={go} />;
+  if (view.name === "tasks") return <TaskCenter env={env} go={go} />;
+  if (view.name === "documents")
     return (
-      <ManagementDashboard
+      <DocumentsHub
         env={env}
         go={go}
-        reports={view.name === "reports"}
+        presets={presets}
+        onCreateQuote={onCreateQuote}
       />
     );
   if (view.name === "crm_record")
@@ -42,6 +51,7 @@ export default function CRMPage({ view, go, presets, onCreateQuote }) {
         go={go}
         presets={presets}
         onCreateQuote={onCreateQuote}
+        initialAction={view.action}
       />
     );
   if (view.name === "opportunities") return <Pipeline env={env} go={go} />;

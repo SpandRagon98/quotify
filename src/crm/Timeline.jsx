@@ -1,5 +1,11 @@
 import { useState } from "react";
 import { useRecords } from "./useRecords";
+import { JOURNEY } from "./brain";
+function friendly(text = "") {
+  let result = text.replaceAll("opportunities", "deals").replaceAll("opportunity", "deal").replaceAll("quote links", "document").replaceAll("activities", "activity").replaceAll("contacts", "contact").replaceAll("account created", "company created").replaceAll("lead updated", "enquiry updated");
+  for(const [stage, label] of JOURNEY) result = result.replaceAll(stage, label);
+  return result;
+}
 export default function Timeline({ env, related }) {
   const [page, setPage] = useState(0);
   const data = useRecords("events", env.user.orgId, { page, related });
@@ -12,9 +18,9 @@ export default function Timeline({ env, related }) {
         <article key={event.id}>
           <span className="crm-timeline-dot" />
           <div>
-            <strong>{event.title}</strong>
+            <strong>{friendly(event.title)}</strong>
             {event.detail && (
-              <p className="crm-preserve-lines">{event.detail}</p>
+              <p className="crm-preserve-lines">{friendly(event.detail)}</p>
             )}
             <small>
               {new Date(event.created_at).toLocaleString()} ·{" "}

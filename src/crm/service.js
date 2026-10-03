@@ -35,7 +35,7 @@ async function unwrap(request, signal) {
 export const rpc = (name, args = {}, signal) =>
   unwrap(client().rpc(name, args), signal);
 export async function bootstrap(orgId, signal) {
-  const [members, access, teams, workspaces] = await Promise.all([
+  const [members, access, teams, workspaces, journeyRules] = await Promise.all([
     rpc("crm_members", { p_org: orgId }, signal),
     rpc("crm_access", { p_org: orgId }, signal),
     unwrap(
@@ -47,8 +47,9 @@ export async function bootstrap(orgId, signal) {
       signal,
     ),
     rpc("crm_workspaces", {}, signal),
+    unwrap(client().from("crm_journey_settings").select("quote_attention_days,quote_risk_days,enquiry_attention_hours").eq("org_id", orgId).maybeSingle(), signal),
   ]);
-  return { members, access, teams, workspaces };
+  return { members, access, teams, workspaces, journeyRules: journeyRules || {} };
 }
 export async function listRecords(
   entity,

@@ -53,7 +53,7 @@ const communication = [
   field("phone", "Phone", "tel"),
   field("alternate_phone", "Alternate phone", "tel"),
 ];
-const account = field("account_id", "Account", "relation", {
+const account = field("account_id", "Company / customer", "relation", {
   entity: "accounts",
   required: true,
 });
@@ -109,8 +109,8 @@ export const ENTITIES = {
     ],
   },
   accounts: {
-    title: "Accounts",
-    singular: "Account",
+    title: "Companies & personal accounts",
+    singular: "Company",
     label: "name",
     columns: [
       "name",
@@ -122,7 +122,7 @@ export const ENTITIES = {
       "city",
     ],
     fields: [
-      field("name", "Account name", "text", { required: true }),
+      field("name", "Company name", "text", { required: true }),
       owner,
       field("account_type", "Type", "select", {
         options: ["Company", "Personal", "Prospect", "Customer", "Partner", "Other"],
@@ -170,8 +170,8 @@ export const ENTITIES = {
     ],
   },
   opportunities: {
-    title: "Opportunities",
-    singular: "Opportunity",
+    title: "Deals",
+    singular: "Deal",
     label: "name",
     columns: [
       "name",
@@ -183,7 +183,7 @@ export const ENTITIES = {
       "probability",
     ],
     fields: [
-      field("name", "Opportunity name", "text", { required: true }),
+      field("name", "Deal name", "text", { required: true }),
       account,
       contact,
       owner,

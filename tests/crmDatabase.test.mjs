@@ -63,6 +63,7 @@ before(async () => {
     "0015_customer_lifecycle",
     "0016_backfill_lead_customers",
     "0017_sales_automation",
+    "0019_lead_to_cash_journey",
   ]) {
     const sql = await readFile(
       new URL(`../supabase/migrations/${name}.sql`, import.meta.url),
@@ -91,6 +92,338 @@ before(async () => {
   );
 });
 after(async () => pg.close());
+async function isolated(fn) {
+  await pg.exec("begin");
+  isolatedTransaction = true;
+  try {
+    await fn();
+  } finally {
+    isolatedTransaction = false;
+    await pg.exec("reset role;rollback");
+  }
+}
+test("journey capture is atomic, detects duplicates and preserves scoped customer relations", async () =>
+  isolated(async () => {
+    await as(admin, async () => {
+      const result = (
+        await q("select crm_quick_capture($1,$2,true) as result", [
+          org,
+          JSON.stringify({
+            name: "Rahul Journey",
+            company_name: "Journey Industries",
+            email: "journey@test.invalid",
+            estimated_value: 500000,
+            product: "Analytics consulting",
+          }),
+        ])
+      )[0].result;
+      assert.ok(
+        result.account_id && result.contact_id && result.opportunity_id,
+      );
+      const deal = (
+        await q("select * from crm_journey_deals where id=$1", [
+          result.opportunity_id,
+        ])
+      )[0];
+      assert.equal(deal.company_name, "Journey Industries");
+      assert.equal(Number(deal.amount), 500000);
+      assert.match(deal.customer_name, /Rahul Journey/);
+      assert.equal(
+        (
+          await q("select opportunity_id from crm_leads where id=$1", [
+            result.lead_id,
+          ])
+        )[0].opportunity_id,
+        result.opportunity_id,
+      );
+      await assert.rejects(
+        q("select crm_quick_capture($1,$2,true)", [
+          org,
+          JSON.stringify({ name: "Duplicate", email: "journey@test.invalid" }),
+        ]),
+        /already uses/,
+      );
+      const before = (await q("select count(*)::int as n from crm_leads"))[0].n;
+      await assert.rejects(
+        q("select crm_quick_capture($1,$2,true)", [
+          org,
+          JSON.stringify({ name: "Bad value", estimated_value: -5 }),
+        ]),
+      );
+      assert.equal(
+        (await q("select count(*)::int as n from crm_leads"))[0].n,
+        before,
+      );
+    });
+    await as(stranger, async () => {
+      for (const view of [
+        "crm_journey_customers",
+        "crm_journey_contacts",
+        "crm_journey_deals",
+        "crm_journey_tasks",
+        "crm_journey_documents",
+      ])
+        assert.equal(
+          (
+            await q(
+              "select count(*)::int as n from " + view + " where org_id=$1",
+              [org],
+            )
+          )[0].n,
+          0,
+        );
+      await assert.rejects(
+        q('select crm_quick_capture($1,\'{"name":"Forbidden"}\',true)', [org]),
+        /permission required/,
+      );
+    });
+    await as(null, () =>
+      assert.rejects(
+        q("select crm_journey_home($1,now(),now()+interval '1 day','INR')", [
+          org,
+        ]),
+        /permission denied/,
+      ),
+    );
+  }));
+
+test("customer guidance keeps separate deals and their quotations distinct", async () =>
+  isolated(async () => {
+    await as(admin, async () => {
+      const ids = (
+        await q("select crm_quick_capture($1,$2,true) as r", [
+          org,
+          JSON.stringify({
+            name: "Multiple deals",
+            product: "Original scope",
+            timeline: "6 months",
+          }),
+        ])
+      )[0].r;
+      assert.match(
+        (await q("select notes from crm_leads where id=$1", [ids.lead_id]))[0]
+          .notes,
+        /6 months/,
+      );
+      await q(
+        "insert into crm_quote_links(org_id,owner_id,account_id,contact_id,opportunity_id,preset_id,preset_name,quotation_id,amount) values($1,$2,$3,$4,$5,'scope-test','Scope test','QY-SCOPE-1',10000)",
+        [org, admin, ids.account_id, ids.contact_id, ids.opportunity_id],
+      );
+      await q(
+        "select crm_log_quote_email($1,'QY-SCOPE-1','scope-test','scope@test.invalid')",
+        [org],
+      );
+      await q(
+        "update crm_quote_links set sent_at=now()-interval '8 days' where quotation_id='QY-SCOPE-1'",
+      );
+      const fresh = (
+        await q(
+          "insert into crm_opportunities(org_id,owner_id,account_id,contact_id,name,amount) values($1,$2,$3,$4,'New scope',20000) returning id",
+          [org, admin, ids.account_id, ids.contact_id],
+        )
+      )[0];
+      const customer = (
+        await q("select * from crm_journey_customers where id=$1", [
+          ids.account_id,
+        ])
+      )[0];
+      assert.equal(customer.opportunity_id, ids.opportunity_id);
+      assert.equal(customer.pulse_status, "At Risk");
+      await q("update crm_opportunities set stage='Won' where id=$1", [
+        ids.opportunity_id,
+      ]);
+      assert.equal(
+        (
+          await q(
+            "select count(*)::int as n from crm_activities where opportunity_id=$1 and activity_type='Follow-up' and status not in ('Completed','Cancelled')",
+            [ids.opportunity_id],
+          )
+        )[0].n,
+        0,
+      );
+      const active = (
+        await q("select * from crm_journey_customers where id=$1", [
+          ids.account_id,
+        ])
+      )[0];
+      assert.equal(active.opportunity_id, fresh.id);
+      assert.equal(active.quote_id, null);
+      assert.equal(active.quote_sent_at, null);
+    });
+  }));
+
+test("sent quote advances the deal once, responses clear follow-ups and approval wins", async () =>
+  isolated(async () => {
+    await as(admin, async () => {
+      const ids = (
+        await q("select crm_quick_capture($1,$2,true) as r", [
+          org,
+          JSON.stringify({
+            name: "Quote Journey",
+            email: "quote-journey@test.invalid",
+            product: "Design",
+            estimated_value: 250000,
+          }),
+        ])
+      )[0].r;
+      const params = [
+        org,
+        admin,
+        ids.account_id,
+        ids.contact_id,
+        ids.opportunity_id,
+        ids.lead_id,
+      ];
+      await q(
+        "insert into crm_quote_links(org_id,owner_id,account_id,contact_id,opportunity_id,lead_id,preset_id,preset_name,quotation_id,amount) values($1,$2,$3,$4,$5,$6,'journey-test','Journey quote','QY-JOURNEY',250000)",
+        params,
+      );
+      await q(
+        "select crm_log_quote_email($1,'QY-JOURNEY','journey-test','quote-journey@test.invalid')",
+        [org],
+      );
+      await q(
+        "select crm_log_quote_email($1,'QY-JOURNEY','journey-test','quote-journey@test.invalid')",
+        [org],
+      );
+      assert.equal(
+        (
+          await q("select stage from crm_opportunities where id=$1", [
+            ids.opportunity_id,
+          ])
+        )[0].stage,
+        "Proposal/Quotation",
+      );
+      assert.equal(
+        (
+          await q(
+            "select count(*)::int as n from crm_activities where opportunity_id=$1 and activity_type='Follow-up'",
+            [ids.opportunity_id],
+          )
+        )[0].n,
+        1,
+      );
+      await q(
+        "insert into crm_activities(org_id,owner_id,account_id,opportunity_id,title,activity_type,status) values($1,$2,$3,$4,'Outbound email without response','Email','Completed')",
+        [org, admin, ids.account_id, ids.opportunity_id],
+      );
+      assert.equal(
+        (
+          await q(
+            "select status from crm_activities where opportunity_id=$1 and activity_type='Follow-up'",
+            [ids.opportunity_id],
+          )
+        )[0].status,
+        "Pending",
+      );
+      await q(
+        "insert into crm_activities(org_id,owner_id,account_id,opportunity_id,title,activity_type,status,outcome) values($1,$2,$3,$4,'Customer replied','Email','Completed','Received')",
+        [org, admin, ids.account_id, ids.opportunity_id],
+      );
+      assert.equal(
+        (
+          await q(
+            "select status from crm_activities where opportunity_id=$1 and activity_type='Follow-up'",
+            [ids.opportunity_id],
+          )
+        )[0].status,
+        "Completed",
+      );
+      assert.equal(
+        (
+          await q(
+            "select awaiting_reply from crm_journey_documents where quotation_id='QY-JOURNEY'",
+          )
+        )[0].awaiting_reply,
+        false,
+      );
+      await q(
+        "insert into tracked_quotes(org_id,quotation_id,preset_name,token,snapshot,status,created_by) values($1,'QY-JOURNEY','Journey quote','journey-approval-test-token','{}','approved',$2)",
+        [org, admin],
+      );
+      assert.equal(
+        (
+          await q("select stage from crm_opportunities where id=$1", [
+            ids.opportunity_id,
+          ])
+        )[0].stage,
+        "Won",
+      );
+      assert.equal(
+        (
+          await q(
+            "select status from crm_quote_links where quotation_id='QY-JOURNEY'",
+          )
+        )[0].status,
+        "Accepted",
+      );
+      await q(
+        "insert into tracked_quotes(org_id,quotation_id,preset_name,token,snapshot,status,version,superseded,created_by) values($1,'QY-JOURNEY','Journey quote','journey-obsolete-test-token','{}','declined',1,true,$2)",
+        [org, admin],
+      );
+      assert.equal(
+        (
+          await q("select stage from crm_opportunities where id=$1", [
+            ids.opportunity_id,
+          ])
+        )[0].stage,
+        "Won",
+      );
+      await q(
+        "insert into crm_quote_links(org_id,owner_id,account_id,opportunity_id,preset_id,preset_name,quotation_id,document_kind,sent_at,status) values($1,$2,$3,$4,'native-invoice','Invoice','INV-JOURNEY','Invoice',now(),'Sent')",
+        [org, admin, ids.account_id, ids.opportunity_id],
+      );
+      assert.equal(
+        (
+          await q(
+            "select count(*)::int as n from crm_activities where opportunity_id=$1 and activity_type='Follow-up'",
+            [ids.opportunity_id],
+          )
+        )[0].n,
+        1,
+      );
+    });
+  }));
+
+test("automatic quote delivery joins Documents without duplicate follow-ups", async () =>
+  isolated(async () => {
+    const ids = (
+      await as(admin, () =>
+        q("select crm_quick_capture($1,$2,true) as r", [
+          org,
+          JSON.stringify({
+            name: "Automatic Journey",
+            email: "automatic-journey@test.invalid",
+            product: "Consulting",
+            estimated_value: 2000,
+          }),
+        ]),
+      )
+    )[0].r;
+    await q(
+      "update crm_quote_drafts set status='Sent',sent_at=now() where lead_id=$1",
+      [ids.lead_id],
+    );
+    await q("update crm_quote_drafts set status='Sent' where lead_id=$1", [
+      ids.lead_id,
+    ]);
+    const docs = await q("select * from crm_quote_links where lead_id=$1", [
+      ids.lead_id,
+    ]);
+    assert.equal(docs.length, 1);
+    assert.equal(docs[0].preset_id, "automated");
+    assert.equal(docs[0].values_snapshot.__journey.items[0].price, 2000);
+    assert.equal(
+      (
+        await q(
+          "select count(*)::int as n from crm_activities where opportunity_id=$1 and activity_type='Follow-up'",
+          [ids.opportunity_id],
+        )
+      )[0].n,
+      1,
+    );
+  }));
+
 test("quotation email history uses a narrow authorized RPC, including Finance", async () => {
   await pg.exec("begin");
   isolatedTransaction = true;
@@ -230,8 +563,11 @@ test("lead form configuration is workspace-scoped and custom lead values remain 
   });
   await as(viewer, async () => {
     assert.equal(
-      (await q("select fields from crm_lead_form_configs where org_id=$1", [org]))[0]
-        .fields[0].label,
+      (
+        await q("select fields from crm_lead_form_configs where org_id=$1", [
+          org,
+        ])
+      )[0].fields[0].label,
       "Sector",
     );
     assert.equal(
@@ -247,96 +583,210 @@ test("lead form configuration is workspace-scoped and custom lead values remain 
 });
 test("lead scores are calculated on the server and update when readiness changes", async () => {
   await as(admin, async () => {
-    const qualified = (await q(
-      `insert into crm_leads(org_id,owner_id,name,company_name,email,phone,source,estimated_value,priority,status,custom_fields)
+    const qualified = (
+      await q(
+        `insert into crm_leads(org_id,owner_id,name,company_name,email,phone,source,estimated_value,priority,status,custom_fields)
        values($1,$2,'Ready interior lead','Test Homes','ready@test.invalid','+91 9000000000','Website · Interior questionnaire',1200000,'High','Qualified',$3)
        returning lead_score,lead_temperature,lead_score_reasons`,
-      [org, admin, JSON.stringify({
-        custom_locality: 'Indiranagar',
-        custom_possession_status: 'Possession received',
-        custom_timeline: 'Immediately',
-        custom_budget_range: '₹20–35 lakh',
-        custom_carpet_area_sqft: 1200,
-        custom_spaces: ['Full Home'],
-      })],
-    ))[0];
-    assert.equal(qualified.lead_temperature, 'Hot');
+        [
+          org,
+          admin,
+          JSON.stringify({
+            custom_locality: "Indiranagar",
+            custom_possession_status: "Possession received",
+            custom_timeline: "Immediately",
+            custom_budget_range: "₹20–35 lakh",
+            custom_carpet_area_sqft: 1200,
+            custom_spaces: ["Full Home"],
+          }),
+        ],
+      )
+    )[0];
+    assert.equal(qualified.lead_temperature, "Hot");
     assert.ok(qualified.lead_score >= 70);
-    assert.ok(qualified.lead_score_reasons.some((reason) => reason.label === 'Immediate timeline'));
+    assert.ok(
+      qualified.lead_score_reasons.some(
+        (reason) => reason.label === "Immediate timeline",
+      ),
+    );
 
-    const nurtured = (await q(
-      "insert into crm_leads(org_id,owner_id,name) values($1,$2,'Early enquiry') returning id,lead_score,lead_temperature",
-      [org, admin],
-    ))[0];
-    assert.equal(nurtured.lead_temperature, 'Nurture');
-    const updated = (await q(
-      "update crm_leads set phone='+91 9000000001', status='Contacted', priority='High' where id=$1 returning lead_score,lead_temperature",
-      [nurtured.id],
-    ))[0];
+    const nurtured = (
+      await q(
+        "insert into crm_leads(org_id,owner_id,name) values($1,$2,'Early enquiry') returning id,lead_score,lead_temperature",
+        [org, admin],
+      )
+    )[0];
+    assert.equal(nurtured.lead_temperature, "Nurture");
+    const updated = (
+      await q(
+        "update crm_leads set phone='+91 9000000001', status='Contacted', priority='High' where id=$1 returning lead_score,lead_temperature",
+        [nurtured.id],
+      )
+    )[0];
     assert.ok(updated.lead_score > nurtured.lead_score);
-    assert.equal(updated.lead_temperature, 'Nurture');
+    assert.equal(updated.lead_temperature, "Nurture");
   });
 });
 test("change orders preserve the approved scope and require the customer capability link", async () => {
   let order;
   await as(admin, async () => {
-    order = (await q(
-      `insert into crm_change_orders(org_id,owner_id,account_id,opportunity_id,title,scope_before,scope_after,delta_amount,delta_days,customer_email)
+    order = (
+      await q(
+        `insert into crm_change_orders(org_id,owner_id,account_id,opportunity_id,title,scope_before,scope_after,delta_amount,delta_days,customer_email)
        values($1,$2,$3,$4,'Upgrade wardrobe shutters','Laminate shutters','Acrylic shutters with soft-close hardware',75000,5,'customer@test.invalid')
        returning id,share_token,order_number,status`,
-      [org, admin, account, opportunity],
-    ))[0];
-    assert.equal(order.status, 'Draft');
-    await q("update crm_change_orders set status='Sent for approval' where id=$1", [order.id]);
+        [org, admin, account, opportunity],
+      )
+    )[0];
+    assert.equal(order.status, "Draft");
+    await q(
+      "update crm_change_orders set status='Sent for approval' where id=$1",
+      [order.id],
+    );
   });
   await as(null, async () => {
-    const publicOrder = (await q("select crm_change_order_public($1) as result", [order.share_token]))[0].result;
-    assert.equal(publicOrder.title, 'Upgrade wardrobe shutters');
-    assert.equal(publicOrder.status, 'Sent for approval');
-    const response = (await q("select crm_respond_change_order($1,'Approved','Ada Customer','Please proceed') as result", [order.share_token]))[0].result;
-    assert.equal(response.status, 'Approved');
+    const publicOrder = (
+      await q("select crm_change_order_public($1) as result", [
+        order.share_token,
+      ])
+    )[0].result;
+    assert.equal(publicOrder.title, "Upgrade wardrobe shutters");
+    assert.equal(publicOrder.status, "Sent for approval");
+    const response = (
+      await q(
+        "select crm_respond_change_order($1,'Approved','Ada Customer','Please proceed') as result",
+        [order.share_token],
+      )
+    )[0].result;
+    assert.equal(response.status, "Approved");
   });
   await as(admin, async () => {
-    const saved = (await q("select status,customer_name,customer_response_note from crm_change_orders where id=$1", [order.id]))[0];
-    assert.equal(saved.status, 'Approved');
-    assert.equal(saved.customer_name, 'Ada Customer');
-    await assert.rejects(q("update crm_change_orders set status='Rejected' where id=$1", [order.id]), /approval link|final/i);
+    const saved = (
+      await q(
+        "select status,customer_name,customer_response_note from crm_change_orders where id=$1",
+        [order.id],
+      )
+    )[0];
+    assert.equal(saved.status, "Approved");
+    assert.equal(saved.customer_name, "Ada Customer");
+    await assert.rejects(
+      q("update crm_change_orders set status='Rejected' where id=$1", [
+        order.id,
+      ]),
+      /approval link|final/i,
+    );
   });
 });
 test("leads create B2B or personal customer records and archive dependent records safely", async () => {
   await as(admin, async () => {
-    const personal = (await q(
-      "insert into crm_leads(org_id,owner_id,name,email) values($1,$2,'Priya Home','priya@test.invalid') returning id,account_id,contact_id",
-      [org, admin],
-    ))[0];
-    const personalLinked = (await q("select l.account_id,l.contact_id,a.account_type,a.name from crm_leads l join crm_accounts a on a.id=l.account_id where l.id=$1", [personal.id]))[0];
-    assert.equal(personalLinked.account_type, 'Personal');
-    assert.equal(personalLinked.name, 'Priya Home');
-    await q("update crm_contacts set archived_at=now() where id=$1", [personalLinked.contact_id]);
-    assert.equal((await q("select archived_at,contact_id from crm_leads where id=$1", [personal.id]))[0].archived_at, null);
-    assert.equal((await q("select contact_id from crm_leads where id=$1", [personal.id]))[0].contact_id, null);
+    const personal = (
+      await q(
+        "insert into crm_leads(org_id,owner_id,name,email) values($1,$2,'Priya Home','priya@test.invalid') returning id,account_id,contact_id",
+        [org, admin],
+      )
+    )[0];
+    const personalLinked = (
+      await q(
+        "select l.account_id,l.contact_id,a.account_type,a.name from crm_leads l join crm_accounts a on a.id=l.account_id where l.id=$1",
+        [personal.id],
+      )
+    )[0];
+    assert.equal(personalLinked.account_type, "Personal");
+    assert.equal(personalLinked.name, "Priya Home");
+    await q("update crm_contacts set archived_at=now() where id=$1", [
+      personalLinked.contact_id,
+    ]);
+    assert.equal(
+      (
+        await q("select archived_at,contact_id from crm_leads where id=$1", [
+          personal.id,
+        ])
+      )[0].archived_at,
+      null,
+    );
+    assert.equal(
+      (
+        await q("select contact_id from crm_leads where id=$1", [personal.id])
+      )[0].contact_id,
+      null,
+    );
 
-    const business = (await q(
-      "insert into crm_leads(org_id,owner_id,name,company_name,email,estimated_value) values($1,$2,'Ada Buyer','Analytical Interiors','ada-buyer@test.invalid',750000) returning id,account_id,contact_id",
-      [org, admin],
-    ))[0];
-    const businessLinked = (await q("select account_id,contact_id from crm_leads where id=$1", [business.id]))[0];
-    assert.equal((await q("select account_type from crm_accounts where id=$1", [businessLinked.account_id]))[0].account_type, 'Company');
-    await q("update crm_leads set status='Interested' where id=$1", [business.id]);
-    const interested = (await q("select opportunity_id from crm_leads where id=$1", [business.id]))[0];
+    const business = (
+      await q(
+        "insert into crm_leads(org_id,owner_id,name,company_name,email,estimated_value) values($1,$2,'Ada Buyer','Analytical Interiors','ada-buyer@test.invalid',750000) returning id,account_id,contact_id",
+        [org, admin],
+      )
+    )[0];
+    const businessLinked = (
+      await q("select account_id,contact_id from crm_leads where id=$1", [
+        business.id,
+      ])
+    )[0];
+    assert.equal(
+      (
+        await q("select account_type from crm_accounts where id=$1", [
+          businessLinked.account_id,
+        ])
+      )[0].account_type,
+      "Company",
+    );
+    await q("update crm_leads set status='Interested' where id=$1", [
+      business.id,
+    ]);
+    const interested = (
+      await q("select opportunity_id from crm_leads where id=$1", [business.id])
+    )[0];
     assert.ok(interested.opportunity_id);
-    await q("update crm_leads set archived_at=now() where id=$1", [business.id]);
-    assert.notEqual((await q("select archived_at from crm_opportunities where id=$1", [interested.opportunity_id]))[0].archived_at, null);
-    assert.notEqual((await q("select archived_at from crm_contacts where id=$1", [businessLinked.contact_id]))[0].archived_at, null);
-    assert.notEqual((await q("select archived_at from crm_accounts where id=$1", [businessLinked.account_id]))[0].archived_at, null);
+    await q("update crm_leads set archived_at=now() where id=$1", [
+      business.id,
+    ]);
+    assert.notEqual(
+      (
+        await q("select archived_at from crm_opportunities where id=$1", [
+          interested.opportunity_id,
+        ])
+      )[0].archived_at,
+      null,
+    );
+    assert.notEqual(
+      (
+        await q("select archived_at from crm_contacts where id=$1", [
+          businessLinked.contact_id,
+        ])
+      )[0].archived_at,
+      null,
+    );
+    assert.notEqual(
+      (
+        await q("select archived_at from crm_accounts where id=$1", [
+          businessLinked.account_id,
+        ])
+      )[0].archived_at,
+      null,
+    );
 
-    const accountCascade = (await q(
-      "insert into crm_leads(org_id,owner_id,name,company_name) values($1,$2,'Account cascade lead','Archive Test Co') returning id,account_id",
-      [org, admin],
-    ))[0];
-    const cascadeLinked = (await q("select account_id from crm_leads where id=$1", [accountCascade.id]))[0];
-    await q("update crm_accounts set archived_at=now() where id=$1", [cascadeLinked.account_id]);
-    assert.notEqual((await q("select archived_at from crm_leads where id=$1", [accountCascade.id]))[0].archived_at, null);
+    const accountCascade = (
+      await q(
+        "insert into crm_leads(org_id,owner_id,name,company_name) values($1,$2,'Account cascade lead','Archive Test Co') returning id,account_id",
+        [org, admin],
+      )
+    )[0];
+    const cascadeLinked = (
+      await q("select account_id from crm_leads where id=$1", [
+        accountCascade.id,
+      ])
+    )[0];
+    await q("update crm_accounts set archived_at=now() where id=$1", [
+      cascadeLinked.account_id,
+    ]);
+    assert.notEqual(
+      (
+        await q("select archived_at from crm_leads where id=$1", [
+          accountCascade.id,
+        ])
+      )[0].archived_at,
+      null,
+    );
   });
 });
 test("multiple contacts, server stage probabilities and Won/Lost validation", async () => {
@@ -449,7 +899,8 @@ test("direct SQL/API authorization: anonymous, other workspace, Viewer, ownershi
   });
   await as(viewer, async () => {
     assert.equal(
-      (await q("select id from crm_accounts where org_id=$1", [org])).length > 0,
+      (await q("select id from crm_accounts where org_id=$1", [org])).length >
+        0,
       true,
     );
     await assert.rejects(
@@ -656,7 +1107,7 @@ test("quotation relationship and Customer 360 timeline use original quotation ID
           "select status from crm_quote_links where quotation_id='QYR-TEST'",
         )
       )[0].status,
-      "approved",
+      "Accepted",
     );
     assert.ok(
       (
@@ -667,8 +1118,9 @@ test("quotation relationship and Customer 360 timeline use original quotation ID
       ).length > 0,
     );
     const metrics = (await q("select crm_metrics($1) as data", [org]))[0].data;
-    assert.equal(Number(metrics.pipeline), 50000);
-    assert.equal(Number(metrics.weighted_pipeline), 10000);
+    assert.equal(Number(metrics.pipeline), 0);
+    assert.equal(Number(metrics.weighted_pipeline), 0);
+    assert.equal(Number(metrics.won_value), 50000);
   });
   await as(null, async () => {
     const publicQuote = (
@@ -879,14 +1331,26 @@ test("qualified leads create one auditable sales quote draft without sending ema
   assert.equal(drafts[0].recipient_email, "quote-customer@test.invalid");
   assert.equal(drafts[0].status, "Ready to send");
   assert.equal(Number(drafts[0].amount), 425000);
-  await q("update crm_leads set status='Interested' where id=$1", [salesLead.id]);
+  await q("update crm_leads set status='Interested' where id=$1", [
+    salesLead.id,
+  ]);
   assert.equal(
-    (await q("select count(*)::int as n from crm_quote_drafts where lead_id=$1", [salesLead.id]))[0].n,
+    (
+      await q(
+        "select count(*)::int as n from crm_quote_drafts where lead_id=$1",
+        [salesLead.id],
+      )
+    )[0].n,
     1,
   );
   await as(sales, async () => {
     assert.equal(
-      (await q("select count(*)::int as n from crm_quote_drafts where lead_id=$1", [salesLead.id]))[0].n,
+      (
+        await q(
+          "select count(*)::int as n from crm_quote_drafts where lead_id=$1",
+          [salesLead.id],
+        )
+      )[0].n,
       1,
     );
   });

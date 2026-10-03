@@ -154,6 +154,7 @@ export default function PublicQuotePage({ token }) {
   };
 
   const snap = quote?.snapshot || {};
+  const invoice = snap.values?.__journey?.kind === "Invoice";
   const automated = snap.kind === "automated" ? snap.automatedQuote || {} : null;
   // Saved document type: Google Doc quotes show the generated Doc; everything
   // else renders the native document from the snapshot.
@@ -272,7 +273,7 @@ export default function PublicQuotePage({ token }) {
             )}
 
             <div className="pub-quote-card pub-quote-actions">
-              {alreadyResponded ? (
+              {invoice ? <><h3>Invoice details</h3><p>Please use the payment instructions in this invoice. Contact the sender for any corrections.</p></> : alreadyResponded ? (
                 <div className={`pub-quote-done pub-done-${alreadyResponded}`}>
                   {alreadyResponded === "approved" && <CheckCircle2 size={22} />}
                   {alreadyResponded === "declined" && <XCircle size={22} />}

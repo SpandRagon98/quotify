@@ -4,6 +4,7 @@ import { ENTITIES, displayName, formPayload } from "./schema";
 import { dispatchSalesAutomation, getRecord, saveRecord } from "./service";
 import { useRecords } from "./useRecords";
 import { eligibleOwners } from "./helpers";
+import { stageLabel } from "./brain";
 export function RelationSelect({
   entity,
   value,
@@ -99,6 +100,49 @@ export default function RecordForm({
   );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [advanced, setAdvanced] = useState(false);
+  const basicFields = {
+    opportunities: [
+      "name",
+      "account_id",
+      "contact_id",
+      "amount",
+      "currency",
+      "stage",
+      "expected_close_date",
+      "next_step",
+      "lost_reason",
+    ],
+    accounts: ["name", "account_type", "email", "phone"],
+    contacts: [
+      "account_id",
+      "first_name",
+      "last_name",
+      "email",
+      "phone",
+      "is_primary",
+    ],
+    activities: [
+      "title",
+      "activity_type",
+      "account_id",
+      "opportunity_id",
+      "due_at",
+      "priority",
+      "status",
+      "description",
+    ],
+    leads: [
+      "name",
+      "company_name",
+      "email",
+      "phone",
+      "product",
+      "estimated_value",
+      "status",
+      "next_follow_up_at",
+    ],
+  };
   const change = (key, value) =>
     setValues((old) => ({
       ...old,
@@ -149,96 +193,117 @@ export default function RecordForm({
     >
       <form onSubmit={submit}>
         <div className="crm-form-grid">
-          {definition.fields.map((f) => {
-            const value = values[f.key];
-            let input;
-            const props = {
-              className: "control",
-              "aria-label": f.label,
-              required: f.required,
-              value: value ?? "",
-              onChange: (e) => change(f.key, e.target.value),
-              maxLength: f.type === "textarea" ? 10000 : 500,
-            };
-            if (f.type === "owner")
-              input = (
-                <select {...props}>
-                  {eligibleOwners(env).map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} · {m.role.replaceAll("_", " ")}
-                    </option>
-                  ))}
-                </select>
-              );
-            else if (f.type === "relation")
-              input = (
-                <RelationSelect
-                  entity={f.entity}
-                  env={env}
-                  value={value}
-                  onChange={(v) => change(f.key, v)}
-                  accountId={f.dependsOn ? values[f.dependsOn] : null}
-                  required={f.required}
-                />
-              );
-            else if (f.type === "select")
-              input = (
-                <select
-                  {...props}
-                  disabled={
-                    entity === "leads" &&
-                    f.key === "status" &&
-                    record.converted_at
-                  }
-                >
-                  {(f.options || [])
-                    .filter((v) => v !== "Converted" || record.converted_at)
-                    .map((v) => (
-                      <option key={v}>{v}</option>
+          {definition.fields
+            .filter(
+              (f) =>
+                advanced ||
+                !basicFields[entity] ||
+                basicFields[entity].includes(f.key),
+            )
+            .map((f) => {
+              const value = values[f.key];
+              let input;
+              const props = {
+                className: "control",
+                "aria-label": f.label,
+                required: f.required,
+                value: value ?? "",
+                onChange: (e) => change(f.key, e.target.value),
+                maxLength: f.type === "textarea" ? 10000 : 500,
+              };
+              if (f.type === "owner")
+                input = (
+                  <select {...props}>
+                    {eligibleOwners(env).map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} · {m.role.replaceAll("_", " ")}
+                      </option>
                     ))}
-                </select>
+                  </select>
+                );
+              else if (f.type === "relation")
+                input = (
+                  <RelationSelect
+                    entity={f.entity}
+                    env={env}
+                    value={value}
+                    onChange={(v) => change(f.key, v)}
+                    accountId={f.dependsOn ? values[f.dependsOn] : null}
+                    required={f.required}
+                  />
+                );
+              else if (f.type === "select")
+                input = (
+                  <select
+                    {...props}
+                    disabled={
+                      entity === "leads" &&
+                      f.key === "status" &&
+                      record.converted_at
+                    }
+                  >
+                    {(f.options || [])
+                      .filter((v) => v !== "Converted" || record.converted_at)
+                      .map((v) => (
+                        <option key={v} value={v}>
+                          {entity === "opportunities" && f.key === "stage"
+                            ? stageLabel(v)
+                            : v}
+                        </option>
+                      ))}
+                  </select>
+                );
+              else if (f.type === "textarea")
+                input = <textarea {...props} rows={3} />;
+              else if (f.type === "checkbox")
+                input = (
+                  <input
+                    type="checkbox"
+                    checked={!!value}
+                    onChange={(e) => change(f.key, e.target.checked)}
+                  />
+                );
+              else if (f.type === "tags")
+                input = (
+                  <input
+                    {...props}
+                    value={Array.isArray(value) ? value.join(", ") : value}
+                  />
+                );
+              else
+                input = (
+                  <input
+                    {...props}
+                    type={f.type}
+                    min={f.type === "number" ? 0 : undefined}
+                    max={f.key === "probability" ? 100 : undefined}
+                    step={f.type === "number" ? "any" : undefined}
+                  />
+                );
+              return (
+                <label
+                  key={f.key}
+                  className={`form-field ${f.type === "textarea" ? "crm-full" : ""}`}
+                >
+                  <span className="form-label">
+                    {f.label}
+                    {f.required && <span aria-hidden="true"> *</span>}
+                  </span>
+                  {input}
+                </label>
               );
-            else if (f.type === "textarea")
-              input = <textarea {...props} rows={3} />;
-            else if (f.type === "checkbox")
-              input = (
-                <input
-                  type="checkbox"
-                  checked={!!value}
-                  onChange={(e) => change(f.key, e.target.checked)}
-                />
-              );
-            else if (f.type === "tags")
-              input = (
-                <input
-                  {...props}
-                  value={Array.isArray(value) ? value.join(", ") : value}
-                />
-              );
-            else
-              input = (
-                <input
-                  {...props}
-                  type={f.type}
-                  min={f.type === "number" ? 0 : undefined}
-                  max={f.key === "probability" ? 100 : undefined}
-                  step={f.type === "number" ? "any" : undefined}
-                />
-              );
-            return (
-              <label
-                key={f.key}
-                className={`form-field ${f.type === "textarea" ? "crm-full" : ""}`}
-              >
-                <span className="form-label">
-                  {f.label}
-                  {f.required && <span aria-hidden="true"> *</span>}
-                </span>
-                {input}
-              </label>
-            );
-          })}
+            })}
         </div>
+        {basicFields[entity] && (
+          <button
+            type="button"
+            className="btn btn-soft"
+            onClick={() => setAdvanced((old) => !old)}
+            aria-expanded={advanced}
+          >
+            {advanced ? "Fewer details" : "More details & ownership"}
+          </button>
+        )}
         {error && (
           <div className="alert alert-error" role="alert">
             {error}

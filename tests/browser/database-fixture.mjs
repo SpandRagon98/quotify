@@ -49,6 +49,8 @@ export async function databaseFixture(page, { role = "owner" } = {}) {
     "0014_change_orders",
     "0015_customer_lifecycle",
     "0016_backfill_lead_customers",
+    "0017_sales_automation",
+    "0019_lead_to_cash_journey",
   ]) {
     await db.exec(
       (
@@ -124,6 +126,7 @@ export async function databaseFixture(page, { role = "owner" } = {}) {
         headers: {
           "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Headers": "*",
+          "Access-Control-Expose-Headers": "content-range",
           ...(count != null
             ? { "content-range": `0-${Math.max(0, count - 1)}/${count}` }
             : {}),
@@ -133,6 +136,10 @@ export async function databaseFixture(page, { role = "owner" } = {}) {
     if (method === "OPTIONS") return respond({});
     if (url.pathname.startsWith("/auth/"))
       return respond({ user: { id: admin.id, email: admin.email } });
+    // The hosted worker is outside this disposable database fixture. Saving an
+    // enquiry must not contact a real email provider during browser checks.
+    if (url.pathname === "/functions/v1/sales-automation")
+      return respond({ processed: 0, fixture: true });
     try {
       if (url.pathname.includes("/rpc/")) {
         const name = url.pathname.split("/").pop();
@@ -175,6 +182,22 @@ export async function databaseFixture(page, { role = "owner" } = {}) {
         if (["select", "order", "offset", "limit", "on_conflict"].includes(key))
           continue;
         if (!/^[a-z_]+$/.test(key)) throw new Error("Unknown fixture filter");
+        if (key === "or") {
+          where.push(
+            "(" +
+              value
+                .slice(1, -1)
+                .split(",")
+                .map((part) => {
+                  const match = part.match(/^([a-z_]+)\.ilike\.(.+)$/);
+                  if (!match) throw new Error("Unsupported fixture OR");
+                  return `${match[1]} ilike ${parameter(match[2])}`;
+                })
+                .join(" or ") +
+              ")",
+          );
+          continue;
+        }
         if (value === "is.null") where.push(`${key} is null`);
         else if (value.startsWith("eq."))
           where.push(`${key}=${parameter(value.slice(3))}`);
@@ -194,6 +217,15 @@ export async function databaseFixture(page, { role = "owner" } = {}) {
           );
         else if (value === "not.in.(Completed,Cancelled)")
           where.push("status not in ('Completed','Cancelled')");
+        else if (value === "not.is.null") where.push(`${key} is not null`);
+        else if (value.startsWith("not.in."))
+          where.push(
+            `${key} not in (${value
+              .slice(8, -1)
+              .split(",")
+              .map((v) => parameter(v))
+              .join(",")})`,
+          );
         else if (value.startsWith("wfts(simple)."))
           where.push(
             `search @@ websearch_to_tsquery('simple',${parameter(value.slice(13))})`,

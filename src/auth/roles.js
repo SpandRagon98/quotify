@@ -44,6 +44,11 @@ TAB_ACCESS.sales_manager=[...CRM_TABS,'database','docview','email','settings'];
 TAB_ACCESS.sales_user=[...CRM_TABS,'database','docview','email','settings'];
 TAB_ACCESS.finance=['crm_dashboard','accounts','contacts','opportunities','reports','database','docview','email','settings'];
 TAB_ACCESS.viewer=[...CRM_TABS,'database','docview','settings'];
+for (const tabs of Object.values(TAB_ACCESS)) {
+  if (tabs.includes('accounts')) tabs.push('customers');
+  if (tabs.includes('activities')) tabs.push('tasks');
+  if (tabs.includes('docview')) tabs.push('documents');
+}
 
 export function allowedTabs(role) {
   return TAB_ACCESS[role] || [];
